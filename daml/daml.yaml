@@ -1,0 +1,10 @@
+sdk-version: 2.10.0
+name: sotto
+source: daml
+version: 0.1.0
+dependencies:
+  - daml-prim
+  - daml-stdlib
+  - daml-script
+build-options:
+  - --target=2.1

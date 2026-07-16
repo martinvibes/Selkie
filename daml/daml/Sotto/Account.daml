@@ -1,0 +1,52 @@
+module Sotto.Account where
+
+import Sotto.Holding
+
+-- | One account per social handle. The operator hosts the owner party
+-- (hosted-party model, like every consumer wallet on Canton today);
+-- what the operator may do is exactly the choices below — there is no
+-- choice that moves funds anywhere but where the owner's instructions
+-- allow, so custody abuse is structurally impossible on-ledger.
+template Account
+  with
+    operator : Party
+    owner    : Party
+    handle   : Text  -- e.g. "@ada"
+    platform : Text  -- "x" | "telegram"
+  where
+    signatory operator, owner
+    key (operator, handle) : (Party, Text)
+    maintainer key._1
+
+    -- Credit this account. Carries the owner's authority from this
+    -- contract's signatures, so the operator can pay people who have
+    -- never seen a wallet — auto-onboarding on first receive.
+    nonconsuming choice Credit : ContractId Holding
+      with
+        asset  : Asset
+        amount : Decimal
+      controller operator
+      do
+        assertMsg "credit must be positive" (amount > 0.0)
+        create Holding with operator, owner, asset, amount
+
+    -- Debit this account by consuming a holding, returning change.
+    nonconsuming choice Debit : Optional (ContractId Holding)
+      with
+        holdingCid : ContractId Holding
+        amount     : Decimal
+      controller operator
+      do
+        h <- fetch holdingCid
+        assertMsg "holding belongs to this account"
+          (h.owner == owner && h.operator == operator)
+        assertMsg "insufficient funds" (h.amount >= amount)
+        assertMsg "debit must be positive" (amount > 0.0)
+        archive holdingCid
+        if h.amount > amount
+          then Some <$> create h with amount = h.amount - amount
+          else pure None
+
+    choice CloseAccount : ()
+      controller owner, operator
+      do pure ()

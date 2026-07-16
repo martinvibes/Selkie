@@ -1,0 +1,44 @@
+module Sotto.Holding where
+
+-- | Assets Sotto supports. CC is Canton Coin; USDCX, CBTC and CETH are
+-- the CIP-56 assets on Canton mainnet. In this MVP holdings are modeled
+-- internally; swapping to the real CIP-56 token interfaces is the
+-- mainnet step (same shape: amount + owner + atomic transfer).
+data Asset = CC | USDCX | CBTC | CETH
+  deriving (Eq, Show)
+
+-- | A balance of one asset for one account owner.
+-- Signed by operator + owner: nobody else on the network can see it.
+-- This is the Canton difference — on a transparent chain this contract
+-- would be public feed data.
+template Holding
+  with
+    operator : Party
+    owner    : Party
+    asset    : Asset
+    amount   : Decimal
+  where
+    signatory operator, owner
+    ensure amount > 0.0
+
+    choice Split : (ContractId Holding, ContractId Holding)
+      with
+        splitAmount : Decimal
+      controller operator
+      do
+        assertMsg "split must be positive and less than total"
+          (splitAmount > 0.0 && splitAmount < amount)
+        a <- create this with amount = splitAmount
+        b <- create this with amount = amount - splitAmount
+        pure (a, b)
+
+    choice Merge : ContractId Holding
+      with
+        otherCid : ContractId Holding
+      controller operator
+      do
+        other <- fetch otherCid
+        assertMsg "must merge same asset, owner and operator"
+          (other.asset == asset && other.owner == owner && other.operator == operator)
+        archive otherCid
+        create this with amount = amount + other.amount
