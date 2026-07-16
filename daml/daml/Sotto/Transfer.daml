@@ -1,0 +1,40 @@
+module Sotto.Transfer where
+
+import Sotto.Account
+import Sotto.Holding
+
+-- | A verified social command ("send 5 USDCX to @bayo") becomes one of
+-- these, then Execute settles it atomically: debit + credit in a single
+-- Canton transaction. Only sender, recipient and operator ever see it —
+-- amounts are never public network data.
+template TransferInstruction
+  with
+    operator  : Party
+    sender    : Party
+    recipient : Party
+    asset     : Asset
+    amount    : Decimal
+    memo      : Text
+  where
+    signatory operator, sender
+    observer recipient
+
+    choice Execute : ContractId Holding
+      with
+        senderAccCid    : ContractId Account
+        recipientAccCid : ContractId Account
+        holdingCid      : ContractId Holding
+      controller operator
+      do
+        senderAcc <- fetch senderAccCid
+        recipientAcc <- fetch recipientAccCid
+        assertMsg "sender account mismatch"
+          (senderAcc.owner == sender && senderAcc.operator == operator)
+        assertMsg "recipient account mismatch"
+          (recipientAcc.owner == recipient && recipientAcc.operator == operator)
+        _ <- exercise senderAccCid Debit with holdingCid, amount
+        exercise recipientAccCid Credit with asset, amount
+
+    choice CancelTransfer : ()
+      controller sender, operator
+      do pure ()

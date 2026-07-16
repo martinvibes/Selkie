@@ -1,0 +1,46 @@
+module Sotto.Request where
+
+import Sotto.Account
+import Sotto.Holding
+import Sotto.Transfer
+
+-- | "request 10 USDCX from @chidi" — the payer approves with one reply,
+-- which settles the transfer atomically, or declines.
+template PaymentRequest
+  with
+    operator  : Party
+    requester : Party
+    payer     : Party
+    asset     : Asset
+    amount    : Decimal
+    memo      : Text
+  where
+    signatory operator, requester
+    observer payer
+
+    choice Approve : ContractId Holding
+      with
+        payerAccCid     : ContractId Account
+        requesterAccCid : ContractId Account
+        holdingCid      : ContractId Holding
+      controller payer, operator
+      do
+        instr <- create TransferInstruction with
+          operator
+          sender = payer
+          recipient = requester
+          asset
+          amount
+          memo
+        exercise instr Execute with
+          senderAccCid = payerAccCid
+          recipientAccCid = requesterAccCid
+          holdingCid
+
+    choice Decline : ()
+      controller payer, operator
+      do pure ()
+
+    choice CancelRequest : ()
+      controller requester, operator
+      do pure ()

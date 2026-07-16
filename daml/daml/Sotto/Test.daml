@@ -1,0 +1,83 @@
+module Sotto.Test where
+
+import DA.Assert ((===))
+import DA.Time (addRelTime, days)
+import Daml.Script
+import Sotto.Account
+import Sotto.Holding
+import Sotto.Transfer
+import Sotto.Escrow
+import Sotto.Request
+
+-- End-to-end happy paths: onboard two users, deposit, tweet-style
+-- transfer, escrow release, payment request approval.
+walletFlows : Script ()
+walletFlows = do
+  operator <- allocateParty "SottoOperator"
+  ada <- allocateParty "Ada"
+  bayo <- allocateParty "Bayo"
+
+  -- Onboarding: one account per handle
+  adaAcc <- submitMulti [operator, ada] [] do
+    createCmd Account with operator, owner = ada, handle = "@ada", platform = "x"
+  bayoAcc <- submitMulti [operator, bayo] [] do
+    createCmd Account with operator, owner = bayo, handle = "@bayo", platform = "x"
+
+  -- Deposit: Ada receives 1.0 CBTC
+  adaHolding <- submit operator do
+    exerciseCmd adaAcc Credit with asset = CBTC, amount = 1.0
+
+  -- "send 0.25 CBTC to @bayo" — settles atomically
+  instr <- submitMulti [operator, ada] [] do
+    createCmd TransferInstruction with
+      operator, sender = ada, recipient = bayo
+      asset = CBTC, amount = 0.25, memo = "coffee"
+  bayoHolding <- submit operator do
+    exerciseCmd instr Execute with
+      senderAccCid = adaAcc
+      recipientAccCid = bayoAcc
+      holdingCid = adaHolding
+  Some received <- queryContractId bayo bayoHolding
+  received.amount === 0.25
+  received.owner === bayo
+
+  -- Ada's change is 0.75
+  [(adaChangeCid, adaChange)] <- query @Holding ada
+  adaChange.amount === 0.75
+
+  -- "escrow 0.1 CBTC with @bayo for 'logo design'" —
+  -- debit + escrow creation in ONE atomic submission
+  now <- getTime
+  let escrow = Escrow with
+        operator, payer = ada, payee = bayo
+        asset = CBTC, amount = 0.1
+        terms = "logo design"
+        deadline = addRelTime now (days 7)
+  (_, escrowCid) <- submitMulti [operator, ada] [] $
+    liftA2 (,)
+      (exerciseCmd adaAcc Debit with holdingCid = adaChangeCid, amount = 0.1)
+      (createCmd escrow)
+
+  -- Ada approves the work: release to Bayo
+  _ <- submitMulti [ada, operator] [] do
+    exerciseCmd escrowCid Release with payeeAccCid = bayoAcc
+
+  -- "request 0.05 CBTC from @ada" by Bayo, approved by Ada
+  reqCid <- submitMulti [operator, bayo] [] do
+    createCmd PaymentRequest with
+      operator, requester = bayo, payer = ada
+      asset = CBTC, amount = 0.05, memo = "lunch split"
+  [(adaCid2, _)] <- query @Holding ada
+  _ <- submitMulti [ada, operator] [] do
+    exerciseCmd reqCid Approve with
+      payerAccCid = adaAcc
+      requesterAccCid = bayoAcc
+      holdingCid = adaCid2
+
+  -- Final balances: Ada 0.60, Bayo 0.25 + 0.10 + 0.05
+  adaFinal <- query @Holding ada
+  sum (map (\h -> (snd h).amount) adaFinal) === 0.60
+  bayoFinal <- query @Holding bayo
+  sum (map (\h -> (snd h).amount) bayoFinal) === 0.40
+
+  pure ()

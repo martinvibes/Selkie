@@ -1,0 +1,39 @@
+module Sotto.Rewards where
+
+import DA.Foldable (forA_)
+import Sotto.Account
+import Sotto.Holding
+
+-- | "reward top 3 replies with 1 CBTC" — a creator funds a campaign
+-- (debited at creation, same atomic submission), the bot picks winners
+-- when it closes, and everyone is paid in one transaction.
+template RewardCampaign
+  with
+    operator : Party
+    creator  : Party
+    asset    : Asset
+    budget   : Decimal
+    criteria : Text  -- e.g. "top 3 replies by likes"
+    deadline : Time
+  where
+    signatory operator, creator
+
+    choice PayWinners : ()
+      with
+        winners : [(ContractId Account, Decimal)]
+      controller operator, creator
+      do
+        let total = sum (map (\w -> w._2) winners)
+        assertMsg "payouts exceed campaign budget" (total <= budget)
+        forA_ winners \(accCid, prize) ->
+          exercise accCid Credit with asset, amount = prize
+
+    choice CancelCampaign : ContractId Holding
+      with
+        creatorAccCid : ContractId Account
+      controller creator, operator
+      do
+        acc <- fetch creatorAccCid
+        assertMsg "creator account mismatch"
+          (acc.owner == creator && acc.operator == operator)
+        exercise creatorAccCid Credit with asset, amount = budget
