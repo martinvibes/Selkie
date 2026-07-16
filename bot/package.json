@@ -1,0 +1,10 @@
+{
+  "name": "sotto-bot",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Sotto command parser and social workers (X + Telegram)",
+  "scripts": {
+    "test": "node --test test/"
+  }
+}
