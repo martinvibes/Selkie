@@ -1,0 +1,9 @@
+<svg width="480" height="480" viewBox="0 0 480 480" xmlns="http://www.w3.org/2000/svg">
+  <rect width="480" height="480" fill="#000000"/>
+  <g stroke-linejoin="round" stroke-width="34">
+    <path d="M 105 113 L 105 269 L 240 191 Z" fill="#FFFFFF" stroke="#FFFFFF" opacity="0.20"/>
+    <path d="M 159 113 L 159 269 L 294 191 Z" fill="#FFFFFF" stroke="#FFFFFF" opacity="0.48"/>
+    <path d="M 213 113 L 213 269 L 348 191 Z" fill="#FFFFFF" stroke="#FFFFFF"/>
+  </g>
+  <text x="243" y="408" text-anchor="middle" font-family="Avenir Next, Helvetica Neue, Arial, sans-serif" font-size="78" font-weight="900" letter-spacing="8" fill="#FFFFFF">SOTTO</text>
+</svg>
