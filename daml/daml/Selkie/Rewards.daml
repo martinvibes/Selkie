@@ -1,8 +1,8 @@
-module Sotto.Rewards where
+module Selkie.Rewards where
 
 import DA.Foldable (forA_)
-import Sotto.Account
-import Sotto.Holding
+import Selkie.Account
+import Selkie.Holding
 
 -- | "reward top 3 replies with 1 CBTC" — a creator funds a campaign
 -- (debited at creation, same atomic submission), the bot picks winners

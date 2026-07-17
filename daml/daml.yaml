@@ -1,5 +1,5 @@
 sdk-version: 2.10.4
-name: sotto
+name: selkie
 source: daml
 version: 0.1.0
 dependencies:

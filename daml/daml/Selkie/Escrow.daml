@@ -1,7 +1,7 @@
-module Sotto.Escrow where
+module Selkie.Escrow where
 
-import Sotto.Account
-import Sotto.Holding
+import Selkie.Account
+import Selkie.Holding
 
 -- | Two-party conditional payment: "escrow 0.1 CBTC with @seller for
 -- 'logo design'". Funds are debited from the payer in the same atomic

@@ -1,6 +1,6 @@
-module Sotto.Holding where
+module Selkie.Holding where
 
--- | Assets Sotto supports. CC is Canton Coin; USDCX, CBTC and CETH are
+-- | Assets Selkie supports. CC is Canton Coin; USDCX, CBTC and CETH are
 -- the CIP-56 assets on Canton mainnet. In this MVP holdings are modeled
 -- internally; swapping to the real CIP-56 token interfaces is the
 -- mainnet step (same shape: amount + owner + atomic transfer).

@@ -1,7 +1,7 @@
-module Sotto.Transfer where
+module Selkie.Transfer where
 
-import Sotto.Account
-import Sotto.Holding
+import Selkie.Account
+import Selkie.Holding
 
 -- | A verified social command ("send 5 USDCX to @bayo") becomes one of
 -- these, then Execute settles it atomically: debit + credit in a single

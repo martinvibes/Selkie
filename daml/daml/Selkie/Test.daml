@@ -1,19 +1,19 @@
-module Sotto.Test where
+module Selkie.Test where
 
 import DA.Assert ((===))
 import DA.Time (addRelTime, days)
 import Daml.Script
-import Sotto.Account
-import Sotto.Holding
-import Sotto.Transfer
-import Sotto.Escrow
-import Sotto.Request
+import Selkie.Account
+import Selkie.Holding
+import Selkie.Transfer
+import Selkie.Escrow
+import Selkie.Request
 
 -- End-to-end happy paths: onboard two users, deposit, tweet-style
 -- transfer, escrow release, payment request approval.
 walletFlows : Script ()
 walletFlows = do
-  operator <- allocateParty "SottoOperator"
+  operator <- allocateParty "SelkieOperator"
   ada <- allocateParty "Ada"
   bayo <- allocateParty "Bayo"
 

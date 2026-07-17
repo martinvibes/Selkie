@@ -1,8 +1,8 @@
-module Sotto.Request where
+module Selkie.Request where
 
-import Sotto.Account
-import Sotto.Holding
-import Sotto.Transfer
+import Selkie.Account
+import Selkie.Holding
+import Selkie.Transfer
 
 -- | "request 10 USDCX from @chidi" — the payer approves with one reply,
 -- which settles the transfer atomically, or declines.

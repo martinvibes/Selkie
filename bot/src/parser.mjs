@@ -1,4 +1,4 @@
-// Sotto command parser — turns a mention text into a structured command.
+// Selkie command parser — turns a mention text into a structured command.
 // Shared by the X worker and the Telegram bot so both surfaces behave
 // identically. Pure function: no I/O, fully unit-testable.
 
@@ -50,7 +50,7 @@ const RULES = [
  * @returns {{type: string, [k: string]: unknown} | null}
  */
 export function parseCommand(text) {
-  const cleaned = text.replace(/@SottoPay/gi, " ").trim();
+  const cleaned = text.replace(/@SelkiePay/gi, " ").trim();
   for (const rule of RULES) {
     const m = cleaned.match(rule.re);
     if (!m) continue;

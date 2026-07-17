@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { parseCommand } from "../src/parser.mjs";
 
 test("send with memo", () => {
-  assert.deepEqual(parseCommand("@SottoPay send 5 USDCX to @lan for coffee"), {
+  assert.deepEqual(parseCommand("@SelkiePay send 5 USDCX to @lan for coffee"), {
     type: "send", amount: "5", asset: "USDCX", to: "lan", memo: "for coffee",
   });
 });
@@ -15,7 +15,7 @@ test("send cBTC case-insensitive asset", () => {
 });
 
 test("request", () => {
-  const cmd = parseCommand("@SottoPay request 10 USDCX from @chidi lunch");
+  const cmd = parseCommand("@SelkiePay request 10 USDCX from @chidi lunch");
   assert.equal(cmd.type, "request");
   assert.equal(cmd.from, "chidi");
 });
@@ -39,7 +39,7 @@ test("reward campaign", () => {
 });
 
 test("balance", () => {
-  assert.deepEqual(parseCommand("@SottoPay balance"), { type: "balance" });
+  assert.deepEqual(parseCommand("@SelkiePay balance"), { type: "balance" });
 });
 
 test("unknown asset rejected", () => {

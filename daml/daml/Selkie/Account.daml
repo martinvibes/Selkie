@@ -1,6 +1,6 @@
-module Sotto.Account where
+module Selkie.Account where
 
-import Sotto.Holding
+import Selkie.Holding
 
 -- | One account per social handle. The operator hosts the owner party
 -- (hosted-party model, like every consumer wallet on Canton today);

@@ -1,8 +1,10 @@
-# Sotto 🤫
+# Selkie 🦭
 
-**Money, said quietly.** Sotto turns any X or Telegram account into a Canton wallet — send real Bitcoin (cBTC), ETH (cETH) and dollars (USDCx) with a single mention. No app. No seed phrase. No gas.
+**Every handle has a hidden skin.** Selkie turns any X or Telegram account into a Canton wallet — send real Bitcoin (cBTC), ETH (cETH) and dollars (USDCx) with a single mention. No app. No seed phrase. No gas.
 
-> `@SottoPay send 5 USDCX to @lan` — that's the whole onboarding.
+> `@SelkiePay send 5 USDCX to @lan` — that's the whole onboarding.
+
+Named for the seal-folk of Celtic myth: ordinary on land, something more beneath the surface. Your X account looks the same as everyone's — but it carries a wallet only you can see into.
 
 Built for **HackCanton Season 2** (July 2026) · Track: Financial Applications · Challenges: cBTC + cETH Ecosystem.
 
@@ -10,7 +12,7 @@ Built for **HackCanton Season 2** (July 2026) · Track: Financial Applications �
 
 Crypto loses billions of social users at the same wall: install a wallet, back up 12 words, buy gas, paste a 0x address. Social-native wallets fix the friction — but on transparent chains they leak everything: every tip, every balance, every payment becomes public feed data.
 
-**Sotto is built on Canton because privacy is native there.** Amounts are visible only to sender and recipient — enforced by the ledger, not a promise.
+**Selkie is built on Canton because privacy is native there.** Amounts are visible only to sender and recipient — enforced by the ledger, not a promise. Money, beneath the surface.
 
 ## What you can do from a mention
 
@@ -27,7 +29,7 @@ Plus a web dashboard (log in with X): balances, history, deposit/withdraw to any
 
 ## How cBTC & cETH are integrated
 
-cBTC and cETH are **first-class settlement assets** in Sotto: every send, escrow, split, reward payout and market settlement is a state change on the asset — debit + credit composed atomically in a single Canton transaction. The MVP models holdings internally (`daml/daml/Sotto/Holding.daml`); the mainnet step swaps these for the CIP-56 token interfaces (same shape: amount + owner + atomic transfer), which is what makes cBTC, cETH and USDCx interchangeable inside one command grammar.
+cBTC and cETH are **first-class settlement assets** in Selkie: every send, escrow, split, reward payout and market settlement is a state change on the asset — debit + credit composed atomically in a single Canton transaction. The MVP models holdings internally (`daml/daml/Selkie/Holding.daml`); the mainnet step swaps these for the CIP-56 token interfaces (same shape: amount + owner + atomic transfer), which is what makes cBTC, cETH and USDCx interchangeable inside one command grammar.
 
 ## Architecture
 
@@ -48,11 +50,11 @@ Hosted-party model (like every consumer wallet on Canton today): the operator ho
 
 ## Status
 
-Building in public, July 16–26 2026 — follow [@SottoPay](https://x.com/SottoPay). Commits land as features do.
+Building in public, July 16–26 2026 — follow [@SelkiePay](https://x.com/SelkiePay). Commits land as features do.
 
 ## Disclosure
 
-Original work, started during HackCanton S2. The "social handle = wallet" UX pattern was popularized by projects like Dugong (Sui); Sotto's design, code and Canton-native architecture (private-by-default amounts, DAML-constrained custody, CIP-56 settlement) are built from scratch for Canton.
+Original work, started during HackCanton S2. The "social handle = wallet" UX pattern was popularized by projects like Dugong (Sui); Selkie's design, code and Canton-native architecture (private-by-default amounts, DAML-constrained custody, CIP-56 settlement) are built from scratch for Canton.
 
 ## License
 

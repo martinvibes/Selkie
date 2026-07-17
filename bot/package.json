@@ -1,9 +1,9 @@
 {
-  "name": "sotto-bot",
+  "name": "selkie-bot",
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Sotto command parser and social workers (X + Telegram)",
+  "description": "Selkie command parser and social workers (X + Telegram)",
   "scripts": {
     "test": "node --test test/"
   }
