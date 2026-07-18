@@ -5,6 +5,8 @@
   "type": "module",
   "description": "Selkie command parser and social workers (X + Telegram)",
   "scripts": {
-    "test": "node --test test/"
+    "test": "node --test test/",
+    "start": "node src/index.mjs",
+    "demo": "node scripts/demo-chat.mjs"
   }
 }

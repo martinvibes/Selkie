@@ -1,0 +1,55 @@
+// Entrypoint: wire config -> ledger -> wallet -> Telegram.
+//
+//   SELKIE_TELEGRAM_TOKEN=... SELKIE_OPERATOR=... node src/index.mjs
+//
+// With no operator party configured it allocates one and prints it, so a fresh
+// sandbox is one command away from a working bot.
+
+import { Ledger } from "./ledger.mjs";
+import { Wallet } from "./wallet.mjs";
+import { TelegramBot } from "./telegram.mjs";
+
+const cfg = {
+  jsonApi: process.env.SELKIE_JSON_API ?? "http://localhost:7575",
+  secret: process.env.SELKIE_JWT_SECRET ?? "secret",
+  ledgerId: process.env.SELKIE_LEDGER_ID ?? "sandbox",
+  pkgId: process.env.SELKIE_PKG_ID,
+  operator: process.env.SELKIE_OPERATOR,
+  telegramToken: process.env.SELKIE_TELEGRAM_TOKEN,
+};
+
+if (!cfg.pkgId) {
+  console.error(
+    "SELKIE_PKG_ID is required.\n" +
+      "  daml damlc inspect-dar --json daml/.daml/dist/selkie-0.1.0.dar | jq -r .main_package_id",
+  );
+  process.exit(1);
+}
+
+const ledger = new Ledger({
+  baseUrl: cfg.jsonApi,
+  secret: cfg.secret,
+  ledgerId: cfg.ledgerId,
+  pkgId: cfg.pkgId,
+});
+
+let operator = cfg.operator;
+if (!operator) {
+  const party = await ledger.allocateParty("selkie-operator");
+  operator = party.identifier;
+  console.log(`Allocated operator party. Reuse it with:\n  export SELKIE_OPERATOR=${operator}\n`);
+}
+
+const wallet = new Wallet({ ledger, operator });
+
+if (!cfg.telegramToken) {
+  console.error("SELKIE_TELEGRAM_TOKEN is required to start the bot (get one from @BotFather).");
+  process.exit(1);
+}
+
+const bot = new TelegramBot({ token: cfg.telegramToken, wallet });
+process.on("SIGINT", () => {
+  bot.stop();
+  process.exit(0);
+});
+await bot.start();
