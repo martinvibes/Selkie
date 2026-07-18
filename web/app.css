@@ -1,0 +1,764 @@
+/* Selkie
+   The page is water. Identity floats on the surface; value sits beneath a
+   waterline, which is the one element carrying the product's whole idea.
+   Gold is reserved for value. Everything else stays quiet. */
+
+:root {
+  --ink: #0b0912;
+  --deep: #060a12;
+  --gold-light: #f6dfa4;
+  --gold: #d9a85c;
+  --gold-deep: #c9964b;
+  --ivory: #f2ebdc;
+
+  --muted: rgb(242 235 220 / 0.52);
+  --faint: rgb(242 235 220 / 0.3);
+  --hairline: rgb(242 235 220 / 0.12);
+  --panel: rgb(242 235 220 / 0.035);
+
+  --font-ui: "Avenir Next", "Helvetica Neue", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-num: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+
+  --step: clamp(1.25rem, 4vw, 2rem);
+  --max: 46rem;
+  --radius: 14px;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+/* Author `display` rules outrank the UA stylesheet's [hidden], so state it
+   once here. Without this, hidden views render on top of visible ones. */
+[hidden] {
+  display: none !important;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: var(--font-ui);
+  font-size: 0.9375rem;
+  line-height: 1.55;
+  color: var(--ivory);
+  background: var(--ink);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Depth: the page gets darker the further down you go. */
+.depth {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background:
+    radial-gradient(120% 60% at 50% -10%, rgb(246 223 164 / 0.07), transparent 60%),
+    linear-gradient(180deg, var(--ink) 0%, var(--deep) 55%, #04070d 100%);
+}
+
+img {
+  max-width: 100%;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+/* --- shared type ------------------------------------------------------ */
+
+.eyebrow {
+  margin: 0;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+
+.wordmark {
+  font-weight: 800;
+  letter-spacing: 0.34em;
+  font-size: 0.9rem;
+}
+
+.wordmark.small {
+  font-size: 0.75rem;
+  letter-spacing: 0.3em;
+}
+
+.section-title {
+  margin: 0;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.num {
+  font-family: var(--font-num);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+.link {
+  color: var(--muted);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+}
+
+.link:hover {
+  color: var(--ivory);
+  border-bottom-color: var(--hairline);
+}
+
+/* --- the waterline: the signature ------------------------------------- */
+
+.waterline {
+  position: relative;
+  height: 1px;
+  margin: 0 auto;
+  width: min(100% - 2 * var(--step), var(--max));
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgb(242 235 220 / 0.16) 12%,
+    rgb(246 223 164 / 0.5) 50%,
+    rgb(242 235 220 / 0.16) 88%,
+    transparent
+  );
+  transform-origin: center;
+}
+
+.waterline::after {
+  content: "";
+  position: absolute;
+  inset: -1px 0 auto;
+  height: 3px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgb(246 223 164 / 0.32) 50%,
+    transparent 100%
+  );
+  background-size: 55% 100%;
+  background-repeat: no-repeat;
+  filter: blur(3px);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .waterline {
+    animation: draw 900ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  .waterline::after {
+    animation: drift 14s linear infinite;
+  }
+}
+
+@keyframes draw {
+  from {
+    transform: scaleX(0);
+    opacity: 0;
+  }
+  to {
+    transform: scaleX(1);
+    opacity: 1;
+  }
+}
+
+@keyframes drift {
+  from {
+    background-position: -45% 0;
+  }
+  to {
+    background-position: 145% 0;
+  }
+}
+
+/* --- buttons ---------------------------------------------------------- */
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.8rem 1.4rem;
+  border: 0;
+  border-radius: 999px;
+  font-size: 0.875rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-decoration: none;
+  cursor: pointer;
+  transition: transform 140ms ease, filter 140ms ease, opacity 140ms ease;
+}
+
+.button.primary {
+  color: #17120a;
+  background: linear-gradient(135deg, var(--gold-light), var(--gold-deep));
+}
+
+.button.primary:hover {
+  filter: brightness(1.07);
+}
+
+.button:active {
+  transform: translateY(1px);
+}
+
+.button[disabled] {
+  opacity: 0.5;
+  cursor: progress;
+}
+
+.button.wide {
+  width: 100%;
+  padding-block: 0.95rem;
+}
+
+/* --- landing ---------------------------------------------------------- */
+
+.landing {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  padding: var(--step);
+}
+
+.landing-head,
+.landing-foot {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  width: min(100%, var(--max));
+  margin-inline: auto;
+}
+
+.landing-foot {
+  justify-content: center;
+  color: var(--faint);
+  font-size: 0.8125rem;
+  padding-block: 1rem;
+}
+
+.thesis {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 0.75rem;
+  text-align: center;
+  /* Cap the centred column so tall screens don't strand it in empty space. */
+  max-height: 46rem;
+  margin-block: auto;
+  padding-block: clamp(1.5rem, 6vh, 3rem);
+}
+
+/* On the landing the waterline is a horizon: it runs the full width of the
+   page, so the handle sits on it and the balance sits under it. */
+.thesis > .waterline {
+  width: 100vw;
+  margin-left: calc(50% - 50vw);
+  margin-block: 1.1rem 1.3rem;
+}
+
+.thesis-handle {
+  margin: 0;
+  font-size: clamp(1.75rem, 7vw, 2.75rem);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--ivory);
+}
+
+.beneath-label {
+  color: rgb(246 223 164 / 0.45);
+}
+
+.thesis-balance {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  background: linear-gradient(135deg, var(--gold-light), var(--gold-deep));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.thesis-balance .num {
+  font-size: clamp(2.5rem, 11vw, 4.25rem);
+  font-weight: 500;
+  letter-spacing: -0.03em;
+}
+
+.thesis-balance .unit {
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.thesis-note {
+  margin: 0;
+  max-width: 24rem;
+  color: var(--muted);
+}
+
+.thesis .button {
+  margin-top: 0.8rem;
+}
+
+.fineprint {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--faint);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  /* The waterline keeps its own draw animation; :not() also protects it from
+     losing that at equal specificity. */
+  .thesis > :not(.waterline) {
+    animation: rise 700ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+  .thesis > :nth-child(1) { animation-delay: 60ms; }
+  .thesis > :nth-child(2) { animation-delay: 120ms; }
+  .thesis > :nth-child(3) { animation-delay: 240ms; }
+  .thesis > :nth-child(4) { animation-delay: 420ms; }
+  .thesis > :nth-child(5) { animation-delay: 500ms; }
+  .thesis > :nth-child(6) { animation-delay: 600ms; }
+  .thesis > :nth-child(7) { animation-delay: 700ms; }
+  .thesis > :nth-child(8) { animation-delay: 780ms; }
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* --- app -------------------------------------------------------------- */
+
+.app {
+  padding-bottom: 4rem;
+}
+
+.topbar,
+.surface,
+.vault,
+.composer,
+.activity {
+  width: min(100% - 2 * var(--step), var(--max));
+  margin-inline: auto;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding-block: 1.1rem;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.who {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  font-size: 0.8125rem;
+}
+
+.who-handle {
+  color: var(--muted);
+}
+
+.surface {
+  padding-block: clamp(1.5rem, 5vh, 3rem) 1.2rem;
+}
+
+.big-handle {
+  margin: 0.35rem 0 0;
+  font-size: clamp(1.5rem, 6vw, 2.25rem);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.vault {
+  padding-block: 1.6rem 0.5rem;
+}
+
+.balances {
+  list-style: none;
+  margin: 1rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.15rem;
+}
+
+.holding {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.7rem 0;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.holding:last-child {
+  border-bottom: 0;
+}
+
+/* Token names keep their real casing (USDCx, cBTC, cETH), so no transform. */
+.holding-asset {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: var(--muted);
+}
+
+.holding-amount {
+  font-size: clamp(1.35rem, 5vw, 1.85rem);
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  background: linear-gradient(135deg, var(--gold-light), var(--gold-deep));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.holding.is-zero .holding-amount {
+  background: none;
+  color: var(--faint);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .holding {
+    animation: rise 600ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+  .holding:nth-child(1) { animation-delay: 80ms; }
+  .holding:nth-child(2) { animation-delay: 150ms; }
+  .holding:nth-child(3) { animation-delay: 220ms; }
+  .holding:nth-child(4) { animation-delay: 290ms; }
+}
+
+.privacy,
+.empty {
+  margin: 1rem 0 0;
+  font-size: 0.8125rem;
+  color: var(--faint);
+  max-width: 34rem;
+}
+
+/* --- composer --------------------------------------------------------- */
+
+.composer {
+  margin-top: 2.5rem;
+  padding: 1.4rem;
+  background: var(--panel);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+}
+
+.composer-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.2rem;
+}
+
+.modes {
+  display: flex;
+  gap: 0.25rem;
+  padding: 0.2rem;
+  background: rgb(0 0 0 / 0.25);
+  border-radius: 999px;
+}
+
+.mode {
+  padding: 0.4rem 0.85rem;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: color 140ms ease, background-color 140ms ease;
+}
+
+.mode.is-active {
+  background: rgb(242 235 220 / 0.1);
+  color: var(--ivory);
+}
+
+.form {
+  display: grid;
+  gap: 1.1rem;
+}
+
+.field {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.row {
+  display: flex;
+  gap: 0.8rem;
+  flex-wrap: wrap;
+}
+
+.grow {
+  flex: 1 1 8rem;
+}
+
+.label {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.optional {
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: none;
+  color: var(--faint);
+}
+
+.input {
+  width: 100%;
+  padding: 0.75rem 0.9rem;
+  background: rgb(0 0 0 / 0.28);
+  border: 1px solid var(--hairline);
+  border-radius: 10px;
+  transition: border-color 140ms ease, background-color 140ms ease;
+}
+
+.input::placeholder {
+  color: rgb(242 235 220 / 0.28);
+}
+
+.input:hover {
+  border-color: rgb(242 235 220 / 0.2);
+}
+
+.input:focus {
+  outline: none;
+  border-color: var(--gold);
+  background: rgb(0 0 0 / 0.4);
+}
+
+.textarea {
+  resize: vertical;
+  line-height: 1.5;
+}
+
+.num-input,
+.select {
+  font-family: var(--font-num);
+  font-variant-numeric: tabular-nums;
+}
+
+.select {
+  appearance: none;
+  padding-right: 2.2rem;
+  background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%),
+    linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+  background-position: calc(100% - 1.1rem) 1.15rem, calc(100% - 0.85rem) 1.15rem;
+  background-size: 5px 5px;
+  background-repeat: no-repeat;
+}
+
+.select option {
+  background: var(--ink);
+}
+
+.handle-input {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.handle-input .at {
+  position: absolute;
+  left: 0.9rem;
+  color: var(--faint);
+  pointer-events: none;
+}
+
+.handle-input .input {
+  padding-left: 1.9rem;
+}
+
+.hint {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--faint);
+}
+
+.form-error {
+  margin: 0;
+  padding: 0.7rem 0.9rem;
+  font-size: 0.8125rem;
+  color: #ffd9c2;
+  background: rgb(255 138 76 / 0.1);
+  border: 1px solid rgb(255 138 76 / 0.3);
+  border-radius: 10px;
+}
+
+/* --- receipt ---------------------------------------------------------- */
+
+.receipt {
+  margin-top: 1.2rem;
+  padding: 1.1rem 1.2rem;
+  border: 1px solid rgb(246 223 164 / 0.28);
+  border-radius: var(--radius);
+  background: rgb(246 223 164 / 0.06);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .receipt {
+    animation: rise 500ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+}
+
+.receipt-line {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.receipt-amount {
+  font-family: var(--font-num);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: var(--gold-light);
+}
+
+.receipt-note {
+  margin: 0.5rem 0 0;
+  font-size: 0.8125rem;
+  color: var(--muted);
+}
+
+.receipt-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.4rem;
+  margin: 0.9rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.receipt-stats div {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.stat-num {
+  font-family: var(--font-num);
+  font-variant-numeric: tabular-nums;
+  font-size: 2.25rem;
+  font-weight: 500;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  color: var(--gold-light);
+}
+
+.stat-label {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+
+/* --- activity --------------------------------------------------------- */
+
+.activity {
+  margin-top: 2.5rem;
+}
+
+.feed {
+  list-style: none;
+  margin: 1rem 0 0;
+  padding: 0;
+}
+
+.event {
+  display: flex;
+  align-items: baseline;
+  gap: 0.8rem;
+  padding: 0.8rem 0;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.event-dir {
+  font-family: var(--font-num);
+  color: var(--faint);
+}
+
+.event.is-in .event-dir {
+  color: var(--gold);
+}
+
+.event-amount {
+  font-family: var(--font-num);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.event-who {
+  color: var(--muted);
+}
+
+.event-memo {
+  margin-left: auto;
+  font-size: 0.8125rem;
+  color: var(--faint);
+  text-align: right;
+}
+
+.event-new {
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--gold-deep);
+  border: 1px solid rgb(201 150 75 / 0.4);
+  border-radius: 999px;
+  padding: 0.1rem 0.45rem;
+}
+
+@media (max-width: 30rem) {
+  .event-memo {
+    display: none;
+  }
+}

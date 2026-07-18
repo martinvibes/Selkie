@@ -37,6 +37,24 @@ export class Wallet {
     return { _1: this.operator, _2: normalizeHandle(handle) };
   }
 
+  /**
+   * Allocate a party for a handle, reusing one that already exists under the
+   * same hint. Onboarding must be safely repeatable: if we ever allocate a
+   * party and then fail before creating the Account, retrying has to recover
+   * rather than lock that handle out of being paid forever.
+   */
+  async ensureParty(hint) {
+    try {
+      const party = await this.ledger.allocateParty(hint);
+      return party.identifier;
+    } catch (err) {
+      const parties = await this.ledger.listParties();
+      const existing = parties.find((p) => String(p.identifier).split("::")[0] === hint);
+      if (existing) return existing.identifier;
+      throw err;
+    }
+  }
+
   /** Fetch an account by handle, or null if this handle has no wallet yet. */
   async findAccount(handle) {
     const res = await this.ledger.fetchByKey(this.accountTid, this.key(handle), [this.operator]);
@@ -54,8 +72,7 @@ export class Wallet {
     if (existing) return { ...existing, created: false };
 
     const norm = normalizeHandle(handle);
-    const party = await this.ledger.allocateParty(partyHint(norm, platform));
-    const owner = party.identifier;
+    const owner = await this.ensureParty(partyHint(norm, platform));
     const res = await this.ledger.create(
       this.accountTid,
       { operator: this.operator, owner, handle: norm, platform },

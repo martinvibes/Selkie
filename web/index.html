@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Selkie</title>
+    <meta name="description" content="Turn any X handle into a private wallet. Send money instantly. No app, no seed phrase, no gas, no public balance." />
+    <link rel="icon" href="/mark.svg" />
+    <link rel="stylesheet" href="/app.css" />
+  </head>
+  <body>
+    <div class="depth" aria-hidden="true"></div>
+
+    <!-- Signed out: the thesis. A handle, and value beneath it. -->
+    <main id="landing" class="landing" hidden>
+      <header class="landing-head">
+        <img src="/mark.svg" alt="" class="mark" width="34" height="34" />
+        <span class="wordmark">SELKIE</span>
+      </header>
+
+      <section class="thesis">
+        <p class="eyebrow">On the surface</p>
+        <p class="thesis-handle" id="thesisHandle">@yourhandle</p>
+
+        <div class="waterline" data-role="thesis"></div>
+
+        <p class="eyebrow beneath-label">Beneath it</p>
+        <div class="thesis-balance">
+          <span class="num" id="thesisNum">0.00</span>
+          <span class="unit">cBTC</span>
+        </div>
+        <p class="thesis-note">Yours the moment someone sends it. No app, no seed phrase, no gas.</p>
+
+        <a class="button primary" href="/auth/x/login" id="loginBtn">Continue with X</a>
+        <p class="fineprint" id="loginHint">Your handle is your wallet. Signing in claims it.</p>
+      </section>
+
+      <footer class="landing-foot">
+        <span>Built on Canton, where balances are private by default.</span>
+      </footer>
+    </main>
+
+    <!-- Signed in: the wallet. -->
+    <main id="app" class="app" hidden>
+      <header class="topbar">
+        <div class="brand">
+          <img src="/mark.svg" alt="" class="mark" width="26" height="26" />
+          <span class="wordmark small">SELKIE</span>
+        </div>
+        <div class="who">
+          <span class="who-handle" id="meHandle">@you</span>
+          <a class="link" href="/auth/logout">Sign out</a>
+        </div>
+      </header>
+
+      <section class="surface">
+        <p class="eyebrow">Your handle, on the surface</p>
+        <h1 class="big-handle" id="bigHandle">@you</h1>
+      </section>
+
+      <div class="waterline" data-role="app"></div>
+
+      <section class="vault" aria-labelledby="vaultLabel">
+        <p class="eyebrow" id="vaultLabel">Beneath the surface</p>
+        <ul class="balances" id="balances"></ul>
+        <p class="privacy">
+          Only you, the person you paid, and the operator can see these amounts.
+          Nothing here is public.
+        </p>
+        <p class="empty" id="emptyState" hidden>
+          Nothing here yet. Your wallet fills up the moment someone sends you something.
+        </p>
+      </section>
+
+      <section class="composer" aria-labelledby="composerLabel">
+        <div class="composer-head">
+          <h2 class="section-title" id="composerLabel">Send</h2>
+          <div class="modes" role="tablist" aria-label="How many people">
+            <button class="mode is-active" id="modeOne" role="tab" aria-selected="true">One person</button>
+            <button class="mode" id="modeMany" role="tab" aria-selected="false">Many people</button>
+          </div>
+        </div>
+
+        <form id="sendForm" class="form" novalidate>
+          <div class="field" id="fieldOne">
+            <label class="label" for="toHandle">To</label>
+            <div class="handle-input">
+              <span class="at">@</span>
+              <input id="toHandle" name="to" class="input" type="text" autocomplete="off"
+                     spellcheck="false" placeholder="handle" />
+            </div>
+            <p class="hint">They don't need an account. If they've never used Selkie, this creates their wallet.</p>
+          </div>
+
+          <div class="field" id="fieldMany" hidden>
+            <label class="label" for="toMany">Winners</label>
+            <textarea id="toMany" class="input textarea" rows="4"
+                      placeholder="@ada @bayo @chidi&#10;one per line, or separated by spaces"></textarea>
+            <p class="hint"><span id="winnerCount">0</span> handles. Each one gets the amount below.</p>
+          </div>
+
+          <div class="row">
+            <div class="field grow">
+              <label class="label" for="amount">Amount<span id="amountEach" hidden> each</span></label>
+              <input id="amount" name="amount" class="input num-input" type="text" inputmode="decimal"
+                     autocomplete="off" placeholder="0.00" />
+            </div>
+            <div class="field">
+              <label class="label" for="asset">Asset</label>
+              <select id="asset" name="asset" class="input select"></select>
+            </div>
+          </div>
+
+          <div class="field">
+            <label class="label" for="memo">Note <span class="optional">optional</span></label>
+            <input id="memo" name="memo" class="input" type="text" maxlength="140"
+                   autocomplete="off" placeholder="what's it for" />
+          </div>
+
+          <button class="button primary wide" id="sendBtn" type="submit">Send</button>
+          <p class="form-error" id="formError" hidden></p>
+        </form>
+
+        <div class="receipt" id="receipt" hidden></div>
+      </section>
+
+      <section class="activity">
+        <h2 class="section-title">Activity</h2>
+        <ul class="feed" id="feed"></ul>
+        <p class="empty" id="feedEmpty" hidden>No payments yet. Send one and it shows up here.</p>
+      </section>
+    </main>
+
+    <script src="/app.js" type="module"></script>
+  </body>
+</html>

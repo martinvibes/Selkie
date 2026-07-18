@@ -94,6 +94,15 @@ describe("wallet on a live ledger", { skip: reachable ? false : "no JSON API on 
     );
   });
 
+  test("onboarding recovers when the party already exists", async () => {
+    // Simulates a crash between allocating a party and creating the account:
+    // the retry must reuse the party, not lock the handle out of being paid.
+    const hint = `selkie-x-orphan${run}`;
+    const first = await wallet.ensureParty(hint);
+    const second = await wallet.ensureParty(hint);
+    assert.equal(second, first, "same party is reused, not re-allocated");
+  });
+
   test("reward campaign pays 20 winners, all previously walletless", async () => {
     const dara = h("dara");
     await wallet.deposit(dara, "CC", 100);

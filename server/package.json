@@ -1,0 +1,11 @@
+{
+  "name": "selkie-server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Selkie web server: X login, wallet API, static hosting",
+  "scripts": {
+    "test": "node --test test/",
+    "start": "node src/index.mjs"
+  }
+}
