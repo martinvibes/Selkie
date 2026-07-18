@@ -1,10 +1,10 @@
-# Selkie 🦭
+# Selkie
 
-**Every handle has a hidden skin.** Selkie turns any X or Telegram account into a Canton wallet — send real Bitcoin (cBTC), ETH (cETH) and dollars (USDCx) with a single mention. No app. No seed phrase. No gas.
+**Turn any X handle into a private wallet.** Send money instantly. No app, no seed phrase, no gas, no public balance.
 
 > `@SelkiePay send 5 USDCX to @lan` — that's the whole onboarding.
 
-Named for the seal-folk of Celtic myth: ordinary on land, something more beneath the surface. Your X account looks the same as everyone's — but it carries a wallet only you can see into.
+If you have a handle, you have a wallet. Selkie carries real Bitcoin (cBTC), ETH (cETH) and dollars (USDCx) on Canton, where balances are private by default.
 
 Built for **HackCanton Season 2** (July 2026) · Track: Financial Applications · Challenges: cBTC + cETH Ecosystem.
 
@@ -41,8 +41,30 @@ Telegram  ──┘   (shared grammar)     │     Escrow · Request · Rewards
 ```
 
 - `daml/` — the ledger model. Operator authorization is constrained to explicit contract choices: there is no choice that moves funds without the owner's instruction, so custody abuse is structurally impossible on-ledger.
-- `bot/` — shared command parser + X/Telegram workers.
+- `bot/` — shared command parser, wallet service, and the Telegram + X workers.
 - `dashboard/` — web app (login with X).
+
+## Run it
+
+```bash
+# 1. ledger
+cd daml && daml build
+daml sandbox --dar .daml/dist/selkie-0.1.0.dar
+daml json-api --ledger-host localhost --ledger-port 6865 \
+  --http-port 7575 --allow-insecure-tokens
+
+# 2. tests (unit + live-ledger integration)
+cd bot && npm test
+
+# 3. see a payout happen
+export SELKIE_PKG_ID=$(daml damlc inspect-dar --json ../daml/.daml/dist/selkie-0.1.0.dar | jq -r .main_package_id)
+node scripts/demo-chat.mjs
+
+# 4. the bot itself
+SELKIE_TELEGRAM_TOKEN=... node src/index.mjs
+```
+
+`demo-chat.mjs` replays a real community payout end to end. Latest local run: **20 winners paid in 9.2s, 20 of 20 onboarded mid-payment, 0 unclaimed.**
 
 ## Trust model
 
