@@ -1,0 +1,97 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: dark;
+  }
+
+  body {
+    @apply bg-ink font-ui text-ivory antialiased;
+    /* Depth: the page darkens as it descends, like water. */
+    background-image:
+      radial-gradient(120% 60% at 50% -10%, rgb(246 223 164 / 0.07), transparent 60%),
+      linear-gradient(180deg, #0b0912 0%, #060a12 55%, #04070d 100%);
+    background-attachment: fixed;
+    min-height: 100vh;
+  }
+
+  :focus-visible {
+    @apply outline-none ring-2 ring-gold ring-offset-2 ring-offset-ink;
+  }
+}
+
+@layer components {
+  /* The signature: a horizon between public identity and private value. */
+  .waterline {
+    @apply relative h-px w-full origin-center animate-draw;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgb(242 235 220 / 0.16) 12%,
+      rgb(246 223 164 / 0.5) 50%,
+      rgb(242 235 220 / 0.16) 88%,
+      transparent
+    );
+  }
+
+  .waterline::after {
+    content: "";
+    @apply absolute inset-x-0 -top-px h-[3px] animate-drift blur-[3px];
+    background: linear-gradient(90deg, transparent, rgb(246 223 164 / 0.32) 50%, transparent);
+    background-size: 55% 100%;
+    background-repeat: no-repeat;
+  }
+
+  .eyebrow {
+    @apply text-[0.6875rem] font-bold uppercase tracking-label text-ivory/30;
+  }
+
+  .label {
+    @apply text-[0.6875rem] font-bold uppercase tracking-label text-ivory/50;
+  }
+
+  .card {
+    @apply rounded-2xl border border-ivory/10 bg-ivory/[0.035] p-5;
+  }
+
+  .input {
+    @apply w-full rounded-xl border border-ivory/10 bg-black/25 px-4 py-3
+           transition placeholder:text-ivory/25 hover:border-ivory/20
+           focus:border-gold focus:bg-black/40 focus:outline-none;
+  }
+
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-full px-6 py-3
+           text-sm font-bold tracking-wide transition active:translate-y-px
+           disabled:cursor-progress disabled:opacity-50;
+  }
+
+  .btn-primary {
+    @apply btn bg-gradient-to-br from-gold-light to-gold-deep text-[#17120a] hover:brightness-110;
+  }
+
+  .btn-ghost {
+    @apply btn border border-ivory/15 text-ivory/70 hover:border-ivory/30 hover:text-ivory;
+  }
+
+  .num {
+    @apply font-num tabular-nums;
+  }
+
+  /* Value is the only thing that gets to be gold. */
+  .value {
+    @apply num bg-gradient-to-br from-gold-light to-gold-deep bg-clip-text text-transparent;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

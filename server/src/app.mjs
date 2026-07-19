@@ -158,10 +158,40 @@ export function createApp({ wallet, config, history }) {
         return res.end();
       }
 
+      // --- public API -------------------------------------------------
+      // A handle's page is shareable, like a payment link. It proves the
+      // handle can be paid and deliberately reveals nothing else: on Canton
+      // a balance is not public data, so this endpoint never returns one.
+      if (pathname.startsWith("/api/account/") && req.method === "GET") {
+        const handle = decodeURIComponent(pathname.slice("/api/account/".length));
+        if (!handle) return send(res, 400, { error: "handle required" });
+        const account = await wallet.findAccount(handle);
+        return send(res, 200, {
+          handle: normalizeHandle(handle),
+          exists: Boolean(account),
+          canReceive: true,
+        });
+      }
+
       // --- API --------------------------------------------------------
       if (pathname.startsWith("/api/")) {
         const session = sessionOf(req);
         if (!session) return send(res, 401, { error: "not signed in" });
+
+        // A payment is visible to the two people in it and nobody else.
+        if (pathname.startsWith("/api/tx/") && req.method === "GET") {
+          const id = decodeURIComponent(pathname.slice("/api/tx/".length));
+          const entry = await history.find(id);
+          if (!entry) return send(res, 404, { error: "no such payment" });
+          const mine = [entry.from, entry.to].map((h) => String(h).toLowerCase());
+          if (!mine.includes(session.handle.toLowerCase())) {
+            return send(res, 404, { error: "no such payment" });
+          }
+          return send(res, 200, {
+            ...entry,
+            direction: String(entry.from).toLowerCase() === session.handle.toLowerCase() ? "out" : "in",
+          });
+        }
 
         if (pathname === "/api/me" && req.method === "GET") {
           const account = await wallet.findAccount(session.handle);
@@ -204,7 +234,7 @@ export function createApp({ wallet, config, history }) {
               memo: String(body.memo ?? "").slice(0, 140),
               platform: "x",
             });
-            await history.append({
+            const logged = await history.append({
               type: "send",
               from: result.from,
               to: result.to,
@@ -213,7 +243,7 @@ export function createApp({ wallet, config, history }) {
               memo: result.memo,
               onboarded: result.onboarded,
             });
-            return send(res, 200, result);
+            return send(res, 200, { ...result, id: logged.id });
           } catch (err) {
             const status = err.code === "INSUFFICIENT_FUNDS" ? 400 : 500;
             return send(res, status, { error: err.message, code: err.code ?? null });

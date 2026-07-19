@@ -8,3 +8,7 @@ dist/
 .DS_Store
 __pycache__/
 .venv/
+
+# Runtime state, not source: local activity log and DAML sandbox logs.
+.data/
+daml/log/

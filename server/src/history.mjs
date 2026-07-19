@@ -5,6 +5,7 @@
 // contract set and users still want to see what happened.
 
 import { appendFile, readFile, mkdir } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
 import { dirname } from "node:path";
 
 export class History {
@@ -13,7 +14,7 @@ export class History {
   }
 
   async append(entry) {
-    const row = { ts: new Date().toISOString(), ...entry };
+    const row = { id: randomUUID(), ts: new Date().toISOString(), ...entry };
     await mkdir(dirname(this.path), { recursive: true });
     await appendFile(this.path, JSON.stringify(row) + "\n");
     return row;
@@ -37,6 +38,10 @@ export class History {
       if (err.code === "ENOENT") return [];
       throw err;
     }
+  }
+
+  async find(id) {
+    return (await this.all()).find((r) => r.id === id) ?? null;
   }
 
   /** Newest first, only what this handle took part in. */
