@@ -5,14 +5,11 @@
 // With no operator party configured it allocates one and prints it, so a fresh
 // sandbox is one command away from a working bot.
 
-import { Ledger } from "./ledger.mjs";
+import { ledgerFromEnv } from "./ledger.mjs";
 import { Wallet } from "./wallet.mjs";
 import { TelegramBot } from "./telegram.mjs";
 
 const cfg = {
-  jsonApi: process.env.SELKIE_JSON_API ?? "http://localhost:7575",
-  secret: process.env.SELKIE_JWT_SECRET ?? "secret",
-  ledgerId: process.env.SELKIE_LEDGER_ID ?? "sandbox",
   pkgId: process.env.SELKIE_PKG_ID,
   operator: process.env.SELKIE_OPERATOR,
   telegramToken: process.env.SELKIE_TELEGRAM_TOKEN,
@@ -26,15 +23,14 @@ if (!cfg.pkgId) {
   process.exit(1);
 }
 
-const ledger = new Ledger({
-  baseUrl: cfg.jsonApi,
-  secret: cfg.secret,
-  ledgerId: cfg.ledgerId,
-  pkgId: cfg.pkgId,
-});
+const { ledger, live } = ledgerFromEnv();
 
 let operator = cfg.operator;
 if (!operator) {
+  if (live) {
+    console.error("SELKIE_OPERATOR is required when running against a real validator.");
+    process.exit(1);
+  }
   const party = await ledger.allocateParty("selkie-operator");
   operator = party.identifier;
   console.log(`Allocated operator party. Reuse it with:\n  export SELKIE_OPERATOR=${operator}\n`);

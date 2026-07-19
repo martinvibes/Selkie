@@ -5,7 +5,7 @@
 import { randomBytes } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { dirname, join, resolve } from "node:path";
-import { Ledger } from "../../bot/src/ledger.mjs";
+import { ledgerFromEnv } from "../../bot/src/ledger.mjs";
 import { Wallet } from "../../bot/src/wallet.mjs";
 import { History } from "./history.mjs";
 import { createApp } from "./app.mjs";
@@ -33,15 +33,17 @@ if (!process.env.SELKIE_SESSION_SECRET) {
   console.warn("SELKIE_SESSION_SECRET not set: sessions will not survive a restart.");
 }
 
-const ledger = new Ledger({
-  baseUrl: process.env.SELKIE_JSON_API ?? "http://localhost:7575",
-  secret: process.env.SELKIE_JWT_SECRET ?? "secret",
-  ledgerId: process.env.SELKIE_LEDGER_ID ?? "sandbox",
-  pkgId: process.env.SELKIE_PKG_ID,
-});
+const { ledger, live } = ledgerFromEnv();
 
 let operator = process.env.SELKIE_OPERATOR;
 if (!operator) {
+  // On a real validator the operator party is created once, at onboarding, and
+  // its id is what people send tokens to. Inventing a fresh one on boot would
+  // silently orphan every balance we already hold.
+  if (live) {
+    console.error("SELKIE_OPERATOR is required when running against a real validator.");
+    process.exit(1);
+  }
   const party = await ledger.allocateParty("selkie-operator");
   operator = party.identifier;
   console.log(`Allocated operator party. Reuse it with:\n  export SELKIE_OPERATOR=${operator}\n`);
