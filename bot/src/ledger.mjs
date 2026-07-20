@@ -1,24 +1,32 @@
-// Minimal Daml JSON API client. No dependencies: node's fetch + crypto only.
+// Canton JSON Ledger API v2 client. No dependencies: node's fetch + crypto only.
 //
 // Selkie runs the hosted-party model — the operator's participant hosts every
-// user's party, so the operator can submit on their behalf (actAs). What the
-// operator is *allowed* to do is fenced by the DAML choices, not by trust.
+// user's party, so the operator can submit on their behalf (actAs).
+//
+// This talks v2, which is what Canton 3.x speaks. The v1 API this project used
+// against the Daml 2.x sandbox does not exist on a real participant, and the
+// difference is not cosmetic: v2 dropped server-side query-by-attribute, reads
+// are taken against an explicit ledger offset, and tokens are ordinary JWTs
+// rather than the daml.com custom-claim objects 2.x wanted.
 
-import { createHmac } from "node:crypto";
+import { createHmac, randomUUID } from "node:crypto";
 
 const b64url = (s) => Buffer.from(s).toString("base64url");
 
-/** Mint a Daml ledger access token (custom-claims format, HS256). */
-export function mintToken({ secret, applicationId, ledgerId, actAs, readAs = [], admin = false }) {
+/**
+ * Mint a Canton 3 access token.
+ *
+ * Note what is absent: no actAs/readAs/admin claims. Canton 3 derives rights
+ * from the user's rights on the participant, keyed by `sub`. A client cannot
+ * grant itself anything by writing claims, which is why this takes a user id
+ * rather than a permission scope.
+ */
+export function mintToken({ secret, userId, audience, lifetimeSeconds = 3600 }) {
   const header = { alg: "HS256", typ: "JWT" };
   const payload = {
-    "https://daml.com/ledger-api": {
-      ledgerId,
-      applicationId,
-      actAs,
-      readAs: [...new Set([...actAs, ...readAs])],
-      admin,
-    },
+    sub: userId,
+    aud: audience,
+    exp: Math.floor(Date.now() / 1000) + lifetimeSeconds,
   };
   const input = `${b64url(JSON.stringify(header))}.${b64url(JSON.stringify(payload))}`;
   const sig = createHmac("sha256", secret).update(input).digest("base64url");
@@ -26,25 +34,14 @@ export function mintToken({ secret, applicationId, ledgerId, actAs, readAs = [],
 }
 
 /**
- * Sandbox auth: we sign our own tokens with a shared secret, which the ledger
- * only accepts because it was started with --allow-insecure-tokens. Every
- * request carries exactly the rights it needs, because we mint them per call.
+ * LocalNet auth: the participant is configured with `unsafe-jwt-hmac-256` and a
+ * shared secret, so we can sign our own tokens. Real deployments use an OIDC
+ * provider instead; see clientCredentialsAuth.
  */
-export function sharedSecretAuth({ secret, applicationId, ledgerId }) {
-  return async (scope) => mintToken({ secret, applicationId, ledgerId, ...scope });
+export function sharedSecretAuth({ secret = "unsafe", userId, audience }) {
+  return async () => mintToken({ secret, userId, audience });
 }
 
-/**
- * Real-validator auth: a participant in a live network will not accept a token
- * we signed ourselves, so we fetch one from the operator's OIDC provider using
- * the client-credentials grant.
- *
- * The important difference is not the signature, it is who decides what we may
- * do. Here the token says only "I am the Selkie application" — the actAs rights
- * come from the user's rights on the participant, granted once at onboarding.
- * So the per-call scope is deliberately ignored: asking for rights in a claim
- * we control would be asking ourselves for permission.
- */
 /**
  * How long we may hold a token, given how long it lives.
  *
@@ -62,6 +59,11 @@ export function cacheWindowSeconds(lifetimeSeconds, clockSkewSeconds) {
   return Math.max(Math.min(window, lifetimeSeconds * 0.9), 1);
 }
 
+/**
+ * Real-validator auth: a participant in a live network will not accept a token
+ * we signed ourselves, so we fetch one from the operator's OIDC provider using
+ * the client-credentials grant.
+ */
 export function clientCredentialsAuth({
   tokenUrl,
   clientId,
@@ -119,117 +121,241 @@ export class LedgerError extends Error {
 export class Ledger {
   /**
    * @param {object} cfg
-   * @param {string} cfg.baseUrl   - JSON API base, e.g. http://localhost:7575
-   * @param {string} [cfg.secret]  - JWT signing secret (dev sandbox only)
-   * @param {(scope: object) => Promise<string>} [cfg.auth] - token provider;
-   *   pass clientCredentialsAuth() to run against a real validator
-   * @param {string} cfg.ledgerId
-   * @param {string} cfg.applicationId
-   * @param {string} cfg.pkgId     - main package id of the Selkie DAR
+   * @param {string} cfg.baseUrl - JSON API base, e.g. http://localhost:3975
+   * @param {() => Promise<string>} [cfg.auth] - token provider
+   * @param {string} cfg.userId - ledger API user the token speaks for
+   * @param {string} cfg.pkgId - main package id of the Selkie DAR
    */
-  constructor({ baseUrl, secret, auth, ledgerId, applicationId = "selkie", pkgId }) {
+  constructor({
+    baseUrl,
+    auth,
+    secret,
+    userId = "ledger-api-user",
+    audience,
+    pkgId,
+    pkgName = "selkie",
+  }) {
     this.baseUrl = baseUrl.replace(/\/$/, "");
-    this.secret = secret;
-    this.ledgerId = ledgerId;
-    this.applicationId = applicationId;
+    this.userId = userId;
     this.pkgId = pkgId;
-    this.auth = auth ?? sharedSecretAuth({ secret, applicationId, ledgerId });
+    this.pkgName = pkgName;
+    this.auth = auth ?? sharedSecretAuth({ secret, userId, audience });
   }
 
-  /** Fully-qualified template id the JSON API expects. */
+  /** Fully-qualified template id, pinned to the exact package we built. */
   tid(module, template) {
     return `${this.pkgId}:Selkie.${module}:${template}`;
   }
 
-  token({ actAs = [], readAs = [], admin = false } = {}) {
-    return this.auth({ actAs, readAs, admin });
+  /**
+   * The same template, named by package rather than by hash.
+   *
+   * Commands accept a package id, but event filters reject one and want a
+   * package name, so the two forms are not interchangeable. Reads use this;
+   * writes use `tid`, which stays pinned to the exact package we compiled
+   * against so an upgrade cannot silently change what a command means.
+   */
+  nameTid(templateId) {
+    return templateId.replace(/^[^:]+:/, `#${this.pkgName}:`);
   }
 
-  async post(path, body, auth) {
+  token() {
+    return this.auth();
+  }
+
+  async request(path, { method = "GET", body } = {}) {
     const res = await fetch(`${this.baseUrl}${path}`, {
-      method: "POST",
+      method,
       headers: {
-        "content-type": "application/json",
-        authorization: `Bearer ${await this.token(auth)}`,
+        authorization: `Bearer ${await this.token()}`,
+        ...(body ? { "content-type": "application/json" } : {}),
       },
-      body: JSON.stringify(body),
+      ...(body ? { body: JSON.stringify(body) } : {}),
     });
     const text = await res.text();
     let json;
     try {
-      json = JSON.parse(text);
+      json = text ? JSON.parse(text) : {};
     } catch {
       throw new LedgerError(`non-JSON response from ${path}: ${text.slice(0, 200)}`, {
         status: res.status,
       });
     }
-    if (!res.ok || json.status >= 400) {
-      const detail = Array.isArray(json.errors) ? json.errors.join("; ") : text.slice(0, 300);
-      throw new LedgerError(detail, { status: json.status ?? res.status, body: json });
+    if (!res.ok) {
+      throw new LedgerError(json.cause ?? json.error ?? text.slice(0, 300), {
+        status: res.status,
+        body: json,
+      });
     }
-    return json.result;
+    return json;
   }
 
   // --- party management -----------------------------------------------
 
   async allocateParty(hint) {
-    return this.post("/v1/parties/allocate", { identifierHint: hint }, { admin: true });
+    const res = await this.request("/v2/parties", {
+      method: "POST",
+      body: { partyIdHint: hint },
+    });
+    // v1 called this `identifier`; keep that name so callers do not care.
+    return { identifier: res.partyDetails?.party ?? res.party };
   }
 
   async listParties() {
-    const res = await fetch(`${this.baseUrl}/v1/parties`, {
-      headers: { authorization: `Bearer ${await this.token({ admin: true })}` },
-    });
-    const json = await res.json();
-    return json.result ?? [];
+    const res = await this.request("/v2/parties");
+    return (res.partyDetails ?? []).map((p) => ({ identifier: p.party, isLocal: p.isLocal }));
   }
 
-  // --- contracts --------------------------------------------------------
+  // --- commands ---------------------------------------------------------
+
+  /**
+   * Submit commands as one atomic transaction.
+   *
+   * Taking a list rather than a single command is deliberate: it is what lets
+   * handle registration and account creation commit together, which is the
+   * only reason the directory cannot end up holding an orphan entry.
+   */
+  async submit(commands, actAs, readAs = []) {
+    const parties = [...new Set([...actAs, ...readAs])];
+    const res = await this.request("/v2/commands/submit-and-wait-for-transaction", {
+      method: "POST",
+      // The JsCommands envelope nests under `commands`, so the field name
+      // appears twice: the outer group, and the list of commands inside it.
+      body: {
+        commands: {
+          commands,
+          commandId: randomUUID(),
+          userId: this.userId,
+          actAs,
+          readAs,
+        },
+        // The default shape is ACS_DELTA, which reports created and archived
+        // contracts but not the choices that produced them. Selkie needs the
+        // return value of Credit and Merge, so ask for ledger effects.
+        transactionFormat: {
+          transactionShape: "TRANSACTION_SHAPE_LEDGER_EFFECTS",
+          eventFormat: {
+            filtersByParty: Object.fromEntries(
+              parties.map((p) => [
+                p,
+                { cumulative: [{ identifierFilter: { WildcardFilter: { value: {} } } }] },
+              ]),
+            ),
+            verbose: true,
+          },
+        },
+      },
+    });
+    return res.transaction ?? res;
+  }
+
+  /** Created events in a transaction, in order. */
+  static created(tx) {
+    return (tx.events ?? []).map((e) => e.CreatedEvent).filter(Boolean);
+  }
+
+  /** The result value of the first exercised choice in a transaction. */
+  static exerciseResult(tx) {
+    for (const e of tx.events ?? []) {
+      if (e.ExercisedEvent) return e.ExercisedEvent.exerciseResult;
+    }
+    return undefined;
+  }
 
   async create(templateId, payload, actAs) {
-    return this.post("/v1/create", { templateId, payload }, { actAs });
+    const tx = await this.submit(
+      [{ CreateCommand: { templateId, createArguments: payload } }],
+      actAs,
+    );
+    const ev = Ledger.created(tx)[0];
+    return { contractId: ev?.contractId, payload: ev?.createArgument, tx };
   }
 
   async exercise(templateId, contractId, choice, argument, actAs) {
-    return this.post("/v1/exercise", { templateId, contractId, choice, argument }, { actAs });
+    const tx = await this.submit(
+      [{ ExerciseCommand: { templateId, contractId, choice, choiceArgument: argument } }],
+      actAs,
+    );
+    return { exerciseResult: Ledger.exerciseResult(tx), tx };
   }
 
-  async exerciseByKey(templateId, key, choice, argument, actAs) {
-    return this.post("/v1/exercise", { templateId, key, choice, argument }, { actAs });
+  // --- reads ------------------------------------------------------------
+
+  async ledgerEnd() {
+    const res = await this.request("/v2/state/ledger-end");
+    return res.offset;
   }
 
-  async query(templateIds, query, readAs) {
-    return this.post("/v1/query", { templateIds, query }, { actAs: readAs });
+  /**
+   * Active contracts for the given templates, optionally narrowed by field.
+   *
+   * v2 removed query-by-attribute, so `match` is applied here rather than at
+   * the participant. The filter stays in this signature anyway: call sites
+   * saying what they want keeps the intent readable, and it is where the work
+   * would move back to if the API ever grows the capability again.
+   */
+  async query(templateIds, match = {}, readAs = []) {
+    const activeAtOffset = await this.ledgerEnd();
+    const cumulative = templateIds.map((templateId) => ({
+      identifierFilter: {
+        TemplateFilter: {
+          value: { templateId: this.nameTid(templateId), includeCreatedEventBlob: false },
+        },
+      },
+    }));
+    const filtersByParty = Object.fromEntries(readAs.map((p) => [p, { cumulative }]));
+
+    const res = await this.request("/v2/state/active-contracts", {
+      method: "POST",
+      body: {
+        activeAtOffset,
+        eventFormat: {
+          ...(readAs.length ? { filtersByParty } : { filtersForAnyParty: { cumulative } }),
+          verbose: true,
+        },
+      },
+    });
+
+    const entries = Array.isArray(res) ? res : (res.activeContracts ?? []);
+    const contracts = entries
+      .map((e) => {
+        const ev =
+          e.contractEntry?.JsActiveContract?.createdEvent ??
+          e.JsActiveContract?.createdEvent ??
+          e.createdEvent;
+        return ev ? { contractId: ev.contractId, payload: ev.createArgument } : null;
+      })
+      .filter(Boolean);
+
+    const wanted = Object.entries(match);
+    if (!wanted.length) return contracts;
+    return contracts.filter((c) => wanted.every(([k, v]) => c.payload?.[k] === v));
   }
 
-  async fetchByKey(templateId, key, readAs) {
-    try {
-      return await this.post("/v1/fetch", { templateId, key }, { actAs: readAs });
-    } catch (err) {
-      if (err.status === 404) return null;
-      throw err;
-    }
+  /** First active contract matching, or null. */
+  async queryOne(templateIds, match, readAs) {
+    const [first] = await this.query(templateIds, match, readAs);
+    return first ?? null;
   }
 }
 
 /**
- * Build a Ledger from the environment. One code path, two very different
- * deployments: a local sandbox that trusts tokens we sign ourselves, and a real
- * validator that trusts only its OIDC provider. Setting SELKIE_AUTH_TOKEN_URL
- * is what flips it — there is no separate "production build".
+ * Build a Ledger from the environment. One code path, two deployments: a
+ * LocalNet participant configured with a shared secret, and a real validator
+ * that trusts only its OIDC provider. Setting SELKIE_AUTH_TOKEN_URL flips it.
  */
 export function ledgerFromEnv(env = process.env) {
   const tokenUrl = env.SELKIE_AUTH_TOKEN_URL;
   const shared = {
-    baseUrl: env.SELKIE_JSON_API ?? "http://localhost:7575",
-    ledgerId: env.SELKIE_LEDGER_ID ?? "sandbox",
-    applicationId: env.SELKIE_APPLICATION_ID ?? "selkie",
+    baseUrl: env.SELKIE_JSON_API ?? "http://localhost:3975",
+    userId: env.SELKIE_LEDGER_USER ?? "ledger-api-user",
+    audience: env.SELKIE_AUTH_AUDIENCE ?? "https://canton.network.global",
     pkgId: env.SELKIE_PKG_ID,
   };
 
   if (!tokenUrl) {
     return {
-      ledger: new Ledger({ ...shared, secret: env.SELKIE_JWT_SECRET ?? "secret" }),
+      ledger: new Ledger({ ...shared, secret: env.SELKIE_JWT_SECRET ?? "unsafe" }),
       live: false,
     };
   }

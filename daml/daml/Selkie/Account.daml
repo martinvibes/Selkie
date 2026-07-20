@@ -2,11 +2,44 @@ module Selkie.Account where
 
 import Selkie.Holding
 
+-- | The operator's index of every handle that has been registered.
+--
+-- This exists because Canton 3 does not support unique contract keys, and
+-- "@ada resolves to exactly one Account" is the invariant the whole product
+-- rests on: if two Accounts can claim @ada, payments land in the wrong wallet.
+--
+-- Uniqueness comes from consumption rather than from a key. Registering a
+-- handle archives this contract and creates its successor, so two concurrent
+-- registrations of the same handle contend on the same contract and Canton
+-- rejects one of them. Creating the Account in the *same* transaction is what
+-- makes it safe: a rolled-back registration cannot leave an orphan entry.
+--
+-- The entry list is rewritten on every registration, which is fine at demo
+-- scale and would need sharding by handle prefix before it is not.
+template AccountDirectory
+  with
+    operator : Party
+    handles  : [Text]
+  where
+    signatory operator
+
+    choice RegisterHandle : ContractId AccountDirectory
+      with
+        handle : Text
+      controller operator
+      do
+        assertMsg ("handle already registered: " <> handle) (handle `notElem` handles)
+        create this with handles = handle :: handles
+
 -- | One account per social handle. The operator hosts the owner party
--- (hosted-party model, like every consumer wallet on Canton today);
--- what the operator may do is exactly the choices below — there is no
--- choice that moves funds anywhere but where the owner's instructions
--- allow, so custody abuse is structurally impossible on-ledger.
+-- (hosted-party model, like every consumer wallet on Canton today).
+--
+-- Being explicit about custody: the operator controls Credit and Debit, so it
+-- can move a holding without the owner's involvement. The DAML fences *what*
+-- shapes of movement are expressible, not *whether* the operator can move
+-- funds. Self-custody requires the owner to control Debit, which requires the
+-- owner's party to be hosted somewhere they hold the key. That is the exit
+-- path, and it is not built yet.
 template Account
   with
     operator : Party
@@ -15,8 +48,6 @@ template Account
     platform : Text  -- "x" | "telegram"
   where
     signatory operator, owner
-    key (operator, handle) : (Party, Text)
-    maintainer key._1
 
     -- Credit this account. Carries the owner's authority from this
     -- contract's signatures, so the operator can pay people who have

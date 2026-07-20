@@ -1,4 +1,4 @@
-sdk-version: 2.10.4
+sdk-version: 3.4.11
 name: selkie
 source: daml
 version: 0.1.0
