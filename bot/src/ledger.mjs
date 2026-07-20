@@ -61,29 +61,23 @@ export function cacheWindowSeconds(lifetimeSeconds, clockSkewSeconds) {
 
 /**
  * Real-validator auth: a participant in a live network will not accept a token
- * we signed ourselves, so we fetch one from the operator's OIDC provider using
- * the client-credentials grant.
+ * we signed ourselves, so we fetch one from the operator's OIDC provider.
+ *
+ * Which grant depends on the operator, not on us. A validator we run ourselves
+ * issues the app its own credentials (client_credentials); a shared node hands
+ * out human logins instead, so the app authenticates as a person (password).
+ * Both end at the same place: a token the participant minted, carrying rights
+ * it decided we have.
  */
-export function clientCredentialsAuth({
-  tokenUrl,
-  clientId,
-  clientSecret,
-  audience,
-  scope,
-  clockSkewSeconds = 60,
-}) {
+export function oauthAuth({ tokenUrl, grant, clockSkewSeconds = 60 }) {
   let cached = null;
 
   return async () => {
     if (cached && Date.now() < cached.expiresAt) return cached.token;
 
-    const form = new URLSearchParams({
-      grant_type: "client_credentials",
-      client_id: clientId,
-      client_secret: clientSecret,
-    });
-    if (audience) form.set("audience", audience);
-    if (scope) form.set("scope", scope);
+    const form = new URLSearchParams(
+      Object.fromEntries(Object.entries(grant).filter(([, v]) => v != null && v !== "")),
+    );
 
     const res = await fetch(tokenUrl, {
       method: "POST",
@@ -107,6 +101,39 @@ export function clientCredentialsAuth({
     };
     return cached.token;
   };
+}
+
+/** An app authenticating as itself, on a validator we control. */
+export function clientCredentialsAuth({ tokenUrl, clientId, clientSecret, audience, scope }) {
+  return oauthAuth({
+    tokenUrl,
+    grant: {
+      grant_type: "client_credentials",
+      client_id: clientId,
+      client_secret: clientSecret,
+      audience,
+      scope,
+    },
+  });
+}
+
+/**
+ * An app authenticating as a human, which is how a shared node works: the
+ * operator onboards a person through the wallet UI, and the app borrows that
+ * login. Selkie's parties therefore live under someone's account rather than
+ * under the application's own identity.
+ */
+export function passwordAuth({ tokenUrl, clientId, username, password, scope }) {
+  return oauthAuth({
+    tokenUrl,
+    grant: {
+      grant_type: "password",
+      client_id: clientId,
+      username,
+      password,
+      scope: scope ?? "openid daml_ledger_api offline_access",
+    },
+  });
 }
 
 export class LedgerError extends Error {
@@ -360,22 +387,32 @@ export function ledgerFromEnv(env = process.env) {
     };
   }
 
-  const missing = ["SELKIE_AUTH_CLIENT_ID", "SELKIE_AUTH_CLIENT_SECRET"].filter((k) => !env[k]);
+  // A password grant means a shared node, where we log in as a person. A
+  // client-secret means a validator that issued the app its own identity.
+  const password = env.SELKIE_AUTH_PASSWORD;
+  const required = password
+    ? ["SELKIE_AUTH_CLIENT_ID", "SELKIE_AUTH_USERNAME"]
+    : ["SELKIE_AUTH_CLIENT_ID", "SELKIE_AUTH_CLIENT_SECRET"];
+  const missing = required.filter((k) => !env[k]);
   if (missing.length) {
     throw new Error(`SELKIE_AUTH_TOKEN_URL is set, so these are required too: ${missing.join(", ")}`);
   }
 
-  return {
-    ledger: new Ledger({
-      ...shared,
-      auth: clientCredentialsAuth({
+  const auth = password
+    ? passwordAuth({
+        tokenUrl,
+        clientId: env.SELKIE_AUTH_CLIENT_ID,
+        username: env.SELKIE_AUTH_USERNAME,
+        password,
+        scope: env.SELKIE_AUTH_SCOPE,
+      })
+    : clientCredentialsAuth({
         tokenUrl,
         clientId: env.SELKIE_AUTH_CLIENT_ID,
         clientSecret: env.SELKIE_AUTH_CLIENT_SECRET,
         audience: env.SELKIE_AUTH_AUDIENCE,
         scope: env.SELKIE_AUTH_SCOPE,
-      }),
-    }),
-    live: true,
-  };
+      });
+
+  return { ledger: new Ledger({ ...shared, auth }), live: true };
 }
