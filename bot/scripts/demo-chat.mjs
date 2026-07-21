@@ -1,16 +1,16 @@
-// Replays a real conversation against a live sandbox: every line you see is a
-// chat message going through the same parser, dispatch and ledger the Telegram
-// bot uses. Nothing is mocked — each reply is backed by Canton contracts.
+// Replays a real conversation against real Canton: every line you see is a chat
+// message going through the same parser, dispatch and ledger the Telegram bot
+// uses. Nothing is mocked — each reply is backed by Canton contracts.
 //
-//   node scripts/demo-chat.mjs
+//   SELKIE_PKG_ID=<pkg id> node scripts/demo-chat.mjs
 //
-// Requires a sandbox + JSON API (see test/wallet.integration.test.mjs).
+// Requires a running participant + JSON API (see test/wallet.integration.test.mjs).
 
 import { Ledger } from "../src/ledger.mjs";
 import { Wallet } from "../src/wallet.mjs";
 import { handleCommand } from "../src/dispatch.mjs";
 
-const BASE = process.env.SELKIE_JSON_API ?? "http://localhost:7575";
+const BASE = process.env.SELKIE_JSON_API ?? "http://localhost:3975";
 const PKG = process.env.SELKIE_PKG_ID;
 if (!PKG) {
   console.error("SELKIE_PKG_ID is required (daml damlc inspect-dar --json ... | jq -r .main_package_id)");
@@ -20,12 +20,14 @@ if (!PKG) {
 const run = Date.now().toString(36).slice(-4);
 const ledger = new Ledger({
   baseUrl: BASE,
-  secret: process.env.SELKIE_JWT_SECRET ?? "secret",
-  ledgerId: process.env.SELKIE_LEDGER_ID ?? "sandbox",
+  secret: process.env.SELKIE_JWT_SECRET ?? "unsafe",
+  userId: process.env.SELKIE_LEDGER_USER ?? "ledger-api-user",
+  audience: process.env.SELKIE_AUTH_AUDIENCE ?? "https://canton.network.global",
   pkgId: PKG,
 });
 
 const operatorParty = await ledger.allocateParty(`selkie-demo-${run}`);
+await ledger.grantActAs(operatorParty.identifier);
 const wallet = new Wallet({ ledger, operator: operatorParty.identifier });
 
 const dara = `dara${run}`;

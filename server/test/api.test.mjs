@@ -11,11 +11,13 @@ import { Wallet } from "../../bot/src/wallet.mjs";
 import { History } from "../src/history.mjs";
 import { createApp } from "../src/app.mjs";
 
-const JSON_API = process.env.SELKIE_JSON_API ?? "http://localhost:7575";
-const PKG = process.env.SELKIE_PKG_ID ?? "d50d0ef1da9ba9cb54c7b72901f4f5abfb628cdd5cc6e6bf98c918ad0e027407";
+const JSON_API = process.env.SELKIE_JSON_API ?? "http://localhost:3975";
+const PKG = process.env.SELKIE_PKG_ID ?? "49a123170adb07f7fee0ee70d30395d1a40336be53a7228cd4d1b1df50ed5f83";
 
-const reachable = await fetch(`${JSON_API}/readyz`)
-  .then((r) => r.ok)
+// Any HTTP response means the participant is up; fetch only rejects on a
+// network error, so a 401 here still counts as reachable.
+const reachable = await fetch(`${JSON_API}/v2/version`)
+  .then(() => true)
   .catch(() => false);
 
 const run = Date.now().toString(36).slice(-5);
@@ -27,11 +29,13 @@ describe("web API", { skip: reachable ? false : "no JSON API on " + JSON_API }, 
   before(async () => {
     const ledger = new Ledger({
       baseUrl: JSON_API,
-      secret: process.env.SELKIE_JWT_SECRET ?? "secret",
-      ledgerId: process.env.SELKIE_LEDGER_ID ?? "sandbox",
+      secret: process.env.SELKIE_JWT_SECRET ?? "unsafe",
+      userId: process.env.SELKIE_LEDGER_USER ?? "ledger-api-user",
+      audience: process.env.SELKIE_AUTH_AUDIENCE ?? "https://canton.network.global",
       pkgId: PKG,
     });
     const operator = await ledger.allocateParty(`selkie-web-${run}`);
+    await ledger.grantActAs(operator.identifier);
     wallet = new Wallet({ ledger, operator: operator.identifier });
     historyPath = join(tmpdir(), `selkie-history-${run}.jsonl`);
 

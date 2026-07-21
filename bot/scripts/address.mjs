@@ -24,12 +24,14 @@ if (!/^1220[0-9a-f]{64}$/.test(fingerprint ?? "")) {
   process.exit(1);
 }
 
-// Confirm the party is real on whatever ledger we are pointed at, so we never
-// print an address that was only ever a string in an env var.
-const parties = await ledger.listParties();
-const known = parties.some((p) => p.identifier === operator);
+// Confirm this is a party we can actually act for on whatever ledger we are
+// pointed at, so we never print an address that was only ever a string in an
+// env var. Listing every party is an admin operation a shared node refuses;
+// our own actAs rights are not, and answer the same question.
+const mine = await ledger.myActAsParties();
+const known = mine.includes(operator);
 if (!known) {
-  console.error(`${operator}\nis not hosted on ${ledger.baseUrl}. Refusing to print it.`);
+  console.error(`${operator}\nis not one this user can act for on ${ledger.baseUrl}. Refusing to print it.`);
   process.exit(1);
 }
 
