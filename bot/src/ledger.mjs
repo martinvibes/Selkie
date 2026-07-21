@@ -233,6 +233,33 @@ export class Ledger {
     return (res.partyDetails ?? []).map((p) => ({ identifier: p.party, isLocal: p.isLocal }));
   }
 
+  // --- user rights ------------------------------------------------------
+  //
+  // Listing every party on a participant is an admin operation a shared node
+  // will refuse. Reading our own rights is not, and it tells us the same thing
+  // we actually need: which parties we may act for. On a shared node the
+  // operator pre-creates parties and grants us actAs; this is how we find them
+  // without ever being an admin.
+
+  /** Full party ids this user may act as, as decided by the participant. */
+  async myActAsParties() {
+    const res = await this.request(`/v2/users/${encodeURIComponent(this.userId)}/rights`);
+    return (res.rights ?? []).map((r) => r.kind?.CanActAs?.value?.party).filter(Boolean);
+  }
+
+  /**
+   * Grant this user actAs on a party. Admin-only, so this works on a node we
+   * run (LocalNet) and is refused on a shared one — where the operator does it
+   * for us instead. Allocation and this grant always travel together: a party
+   * we allocated but cannot act for is useless to us.
+   */
+  async grantActAs(party) {
+    await this.request(`/v2/users/${encodeURIComponent(this.userId)}/rights`, {
+      method: "POST",
+      body: { userId: this.userId, rights: [{ kind: { CanActAs: { value: { party } } } }] },
+    });
+  }
+
   // --- commands ---------------------------------------------------------
 
   /**

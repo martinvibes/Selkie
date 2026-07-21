@@ -4,6 +4,11 @@
 // bot cannot drift apart. The headline behaviour lives in `ensureAccount`:
 // paying a handle that has never touched crypto *creates* that wallet, so a
 // recipient's first interaction is receiving money, not onboarding.
+//
+// Canton 3 shaped two things here. There are no unique contract keys, so a
+// handle resolves to its Account by querying and by the AccountDirectory, not
+// by key lookup. And on a shared node we cannot allocate parties, so a handle's
+// party is discovered from the rights the operator granted us, not minted here.
 
 import { Ledger } from "./ledger.mjs";
 
@@ -29,37 +34,72 @@ export class Wallet {
     this.ledger = ledger;
     this.operator = operator;
     this.accountTid = ledger.tid("Account", "Account");
+    this.directoryTid = ledger.tid("Account", "AccountDirectory");
     this.holdingTid = ledger.tid("Holding", "Holding");
     this.transferTid = ledger.tid("Transfer", "TransferInstruction");
   }
 
-  key(handle) {
-    return { _1: this.operator, _2: normalizeHandle(handle) };
+  /**
+   * Resolve the party for a handle.
+   *
+   * Prefer a party we already hold actAs on: on a shared node the operator
+   * pre-creates the demo parties and grants us rights, and we are not allowed
+   * to allocate our own. Only if none matches do we allocate one, which
+   * succeeds on a node we run (LocalNet) and is refused on a shared one. The
+   * grant travels with the allocation because a party we cannot act for is
+   * useless for co-signing its account.
+   */
+  async ensureParty(hint) {
+    const mine = await this.ledger.myActAsParties();
+    const existing = mine.find((p) => String(p).split("::")[0] === hint);
+    if (existing) return existing;
+
+    try {
+      const party = (await this.ledger.allocateParty(hint)).identifier;
+      await this.ledger.grantActAs(party);
+      return party;
+    } catch (err) {
+      const e = new Error(
+        `no party for "${hint}" and cannot allocate one on this node; ` +
+          `ask the node operator to create it and grant this user actAs`,
+      );
+      e.code = "NO_PARTY";
+      e.cause = err;
+      throw e;
+    }
   }
 
   /**
-   * Allocate a party for a handle, reusing one that already exists under the
-   * same hint. Onboarding must be safely repeatable: if we ever allocate a
-   * party and then fail before creating the Account, retrying has to recover
-   * rather than lock that handle out of being paid forever.
+   * The operator's AccountDirectory, created on first use.
+   *
+   * RegisterHandle consumes and recreates it, so its contract id changes on
+   * every registration; callers must read it fresh rather than cache it.
    */
-  async ensureParty(hint) {
-    try {
-      const party = await this.ledger.allocateParty(hint);
-      return party.identifier;
-    } catch (err) {
-      const parties = await this.ledger.listParties();
-      const existing = parties.find((p) => String(p.identifier).split("::")[0] === hint);
-      if (existing) return existing.identifier;
-      throw err;
-    }
+  async directoryCid() {
+    const existing = await this.ledger.queryOne(
+      [this.directoryTid],
+      { operator: this.operator },
+      [this.operator],
+    );
+    if (existing) return existing.contractId;
+    const res = await this.ledger.create(
+      this.directoryTid,
+      { operator: this.operator, handles: [] },
+      [this.operator],
+    );
+    return res.contractId;
   }
 
   /** Fetch an account by handle, or null if this handle has no wallet yet. */
   async findAccount(handle) {
-    const res = await this.ledger.fetchByKey(this.accountTid, this.key(handle), [this.operator]);
-    if (!res) return null;
-    return { cid: res.contractId, owner: res.payload.owner, handle: res.payload.handle };
+    const norm = normalizeHandle(handle);
+    const acc = await this.ledger.queryOne(
+      [this.accountTid],
+      { operator: this.operator, handle: norm },
+      [this.operator],
+    );
+    if (!acc) return null;
+    return { cid: acc.contractId, owner: acc.payload.owner, handle: acc.payload.handle };
   }
 
   /**
@@ -73,12 +113,37 @@ export class Wallet {
 
     const norm = normalizeHandle(handle);
     const owner = await this.ensureParty(partyHint(norm, platform));
-    const res = await this.ledger.create(
-      this.accountTid,
-      { operator: this.operator, owner, handle: norm, platform },
+    const dirCid = await this.directoryCid();
+
+    // Register the handle and create its Account in ONE transaction. Canton 3
+    // has no unique contract keys, so uniqueness comes from the directory:
+    // two registrations of the same handle contend on the same contract and
+    // one is rejected. Creating the Account in the same transaction means a
+    // rejected registration cannot leave an orphan account behind.
+    const tx = await this.ledger.submit(
+      [
+        {
+          ExerciseCommand: {
+            templateId: this.directoryTid,
+            contractId: dirCid,
+            choice: "RegisterHandle",
+            choiceArgument: { handle: norm },
+          },
+        },
+        {
+          CreateCommand: {
+            templateId: this.accountTid,
+            createArguments: { operator: this.operator, owner, handle: norm, platform },
+          },
+        },
+      ],
       [this.operator, owner],
     );
-    return { cid: res.contractId, owner, handle: norm, created: true };
+    // Exact match, not a substring: "Account:Account" is a prefix of
+    // "Account:AccountDirectory", whose successor is created in this same
+    // transaction, so a loose test would pick the wrong contract.
+    const account = Ledger.created(tx).find((c) => c.templateId === this.accountTid);
+    return { cid: account?.contractId, owner, handle: norm, created: true };
   }
 
   /** All holdings for a handle's owner party. */

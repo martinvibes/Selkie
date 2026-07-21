@@ -110,17 +110,15 @@ test("the live path never signs its own token", async () => {
     });
     assert.equal(live, true);
 
-    const token = await ledger.token({ actAs: ["someone::1220ab"], admin: true });
+    const token = await ledger.token();
     assert.equal(token, "token-1");
 
-    // The whole point: rights come from the participant, not from a claim we
-    // wrote ourselves, so asking for admin must not produce an admin claim.
+    // The whole point: rights come from the participant, not from a token we
+    // signed ourselves, so the live token is the provider's, never a local one.
     const selfSigned = mintToken({
-      secret: "secret",
-      applicationId: "selkie",
-      ledgerId: "sandbox",
-      actAs: ["someone::1220ab"],
-      admin: true,
+      secret: "unsafe",
+      userId: "selkie",
+      audience: "https://canton.network.global",
     });
     assert.notEqual(token, selfSigned);
     assert.doesNotMatch(token, /daml\.com/, "no self-minted ledger-api claims on a live network");
@@ -129,12 +127,15 @@ test("the live path never signs its own token", async () => {
   }
 });
 
-test("sandbox stays the default, so local dev needs no config", async () => {
+test("shared-secret auth is the default, so local dev needs no OIDC config", async () => {
   const { ledger, live } = ledgerFromEnv({ SELKIE_PKG_ID: "pkg" });
   assert.equal(live, false);
-  const token = await ledger.token({ actAs: ["p::1220ab"] });
+  const token = await ledger.token();
   const claims = JSON.parse(Buffer.from(token.split(".")[1], "base64url").toString());
-  assert.deepEqual(claims["https://daml.com/ledger-api"].actAs, ["p::1220ab"]);
+  // Canton 3 tokens are plain JWTs: rights come from the participant keyed by
+  // `sub`, never from a claims object we wrote ourselves.
+  assert.equal(claims.sub, "ledger-api-user");
+  assert.equal(claims["https://daml.com/ledger-api"], undefined, "no self-minted rights claim");
 });
 
 test("half-configured live auth is rejected at boot, not at first payment", () => {

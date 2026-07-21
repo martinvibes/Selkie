@@ -1,25 +1,29 @@
-// End-to-end against a live sandbox: social commands -> real Canton contracts.
+// End-to-end against real Canton 3.x: social commands -> real Canton contracts.
 // Skipped automatically when no ledger is running (so `npm test` stays green
-// on a clean checkout). To run it:
+// on a clean checkout). To run it against LocalNet's app-provider participant:
 //
-//   daml sandbox --dar .daml/dist/selkie-0.1.0.dar
-//   daml json-api --ledger-host localhost --ledger-port 6865 \
-//     --http-port 7575 --allow-insecure-tokens
-//   npm test
+//   cd ~/.pg/splice-node/docker-compose/localnet && \
+//     docker compose --profile sv --profile app-provider --profile app-user up -d
+//   SELKIE_PKG_ID=<selkie pkg id> npm test
+//
+// The defaults below match LocalNet's unsafe-jwt-hmac-256 auth; override with
+// SELKIE_JSON_API / SELKIE_JWT_SECRET / SELKIE_AUTH_AUDIENCE for another node.
 
 import { test, before, describe } from "node:test";
 import assert from "node:assert/strict";
 import { Ledger } from "../src/ledger.mjs";
 import { Wallet } from "../src/wallet.mjs";
 
-const BASE = process.env.SELKIE_JSON_API ?? "http://localhost:7575";
-const PKG = process.env.SELKIE_PKG_ID ?? "d50d0ef1da9ba9cb54c7b72901f4f5abfb628cdd5cc6e6bf98c918ad0e027407";
+const BASE = process.env.SELKIE_JSON_API ?? "http://localhost:3975";
+const PKG = process.env.SELKIE_PKG_ID ?? "49a123170adb07f7fee0ee70d30395d1a40336be53a7228cd4d1b1df50ed5f83";
 
-const reachable = await fetch(`${BASE}/readyz`)
-  .then((r) => r.ok)
+// A response of any status means the participant is up; fetch only rejects on a
+// network error, so a 401 here still counts as reachable.
+const reachable = await fetch(`${BASE}/v2/version`)
+  .then(() => true)
   .catch(() => false);
 
-// Unique per run so repeated runs don't collide on contract keys.
+// Unique per run so repeated runs don't collide on already-registered handles.
 const run = Date.now().toString(36).slice(-5);
 const h = (name) => `@${name}${run}`;
 
@@ -29,11 +33,15 @@ describe("wallet on a live ledger", { skip: reachable ? false : "no JSON API on 
   before(async () => {
     const ledger = new Ledger({
       baseUrl: BASE,
-      secret: process.env.SELKIE_JWT_SECRET ?? "secret",
-      ledgerId: process.env.SELKIE_LEDGER_ID ?? "sandbox",
+      secret: process.env.SELKIE_JWT_SECRET ?? "unsafe",
+      userId: process.env.SELKIE_LEDGER_USER ?? "ledger-api-user",
+      audience: process.env.SELKIE_AUTH_AUDIENCE ?? "https://canton.network.global",
       pkgId: PKG,
     });
+    // On a node we run, the operator is allocated and self-granted actAs; a
+    // shared node's operator does the grant for us instead.
     const operator = await ledger.allocateParty(`selkie-operator-${run}`);
+    await ledger.grantActAs(operator.identifier);
     wallet = new Wallet({ ledger, operator: operator.identifier });
   });
 
