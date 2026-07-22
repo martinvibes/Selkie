@@ -137,9 +137,27 @@ function AccountPill({ me }: { me: Me }) {
 
 export function Header() {
   const { me } = useAuth();
+  const [scrolled, setScrolled] = useState(false);
 
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 14);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  // Floating pills at the top of the page; once content slides underneath,
+  // the bar grows a blurred dark strip so the pills never fight the page.
+  // (The sign-out modal is portaled to <body>, so the backdrop-filter here
+  // can't clip it.)
   return (
-    <header className="sticky top-0 z-40 pt-4">
+    <header
+      className={`sticky top-0 z-40 transition-all duration-300 ${
+        scrolled
+          ? "border-b border-ivory/[0.08] bg-sea-deep/55 py-2.5 shadow-[0_14px_34px_rgba(1,4,8,0.45)] backdrop-blur-xl"
+          : "border-b border-transparent bg-transparent pb-0 pt-4"
+      }`}
+    >
       <Shell wide>
         <div className="flex items-center justify-between gap-4">
           <div className="chunk chunk-pop px-4 py-2">

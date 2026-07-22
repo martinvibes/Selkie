@@ -11,9 +11,9 @@ export default {
         pen: "#131a21",
         muted: "#a8a294",
         sea: {
-          light: "#0d2233",
-          DEFAULT: "#081826",
-          deep: "#040d16",
+          light: "#071522",
+          DEFAULT: "#040e18",
+          deep: "#02070d",
         },
         gold: {
           light: "#f6dfa4",

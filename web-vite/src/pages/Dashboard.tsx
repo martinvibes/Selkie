@@ -125,7 +125,7 @@ function TokenGrid({
 }) {
   const empty = assets.every((a) => !balances[a]);
   return (
-    <section className="chunk mt-6 p-5 sm:p-6">
+    <section className="chunk p-5 sm:p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="font-display text-lg font-bold">Balances</p>
         <span className="flex items-center gap-1.5 text-xs font-semibold text-pen/50">
@@ -133,7 +133,9 @@ function TokenGrid({
         </span>
       </div>
 
-      <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+      {/* Two-up when the card is full-width, a single list in the side
+          column: the amounts stay big either way. */}
+      <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-1">
         {assets.map((asset, i) => {
           const amount = balances[asset] ?? 0;
           return (
@@ -582,17 +584,25 @@ export function Dashboard() {
               ))}
             </nav>
 
-            <div className="w-full min-w-0 max-w-2xl">
+            <div className="w-full min-w-0 lg:max-w-4xl">
               <HeroCard me={me} balances={balances} />
-              <TokenGrid assets={me.assets} balances={balances} reserve={reserve} />
 
-              {/* Keyed by tab so each switch gets the same soft entrance. */}
-              <div className="mt-6 animate-rise" key={tab}>
-                {tab === "activity" && <ActivityFeed entries={entries} />}
-                {tab === "send" && (
-                  <SendPanel assets={me.assets} presetTo={presetTo} onDone={refresh} />
-                )}
-                {tab === "campaign" && <CampaignPanel assets={me.assets} onDone={refresh} />}
+              {/* Below the hero the wallet splits: what you hold on the left,
+                  what you're doing on the right. A rail click lands its panel
+                  on screen immediately — no scrolling to find it. On phones
+                  the panel comes first for the same reason. */}
+              <div className="mt-6 grid items-start gap-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]">
+                {/* Keyed by tab so each switch gets the same soft entrance. */}
+                <div className="min-w-0 animate-rise" key={tab}>
+                  {tab === "activity" && <ActivityFeed entries={entries} />}
+                  {tab === "send" && (
+                    <SendPanel assets={me.assets} presetTo={presetTo} onDone={refresh} />
+                  )}
+                  {tab === "campaign" && <CampaignPanel assets={me.assets} onDone={refresh} />}
+                </div>
+                <div className="min-w-0 lg:sticky lg:top-24 lg:order-first">
+                  <TokenGrid assets={me.assets} balances={balances} reserve={reserve} />
+                </div>
               </div>
             </div>
           </div>

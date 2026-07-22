@@ -10,9 +10,9 @@
 
 @layer base {
   :root {
-    --sea-0: #0d2233;
-    --sea-1: #081826;
-    --sea-2: #040d16;
+    --sea-0: #071522;
+    --sea-1: #040e18;
+    --sea-2: #02070d;
     --ivory: #f4f1ea;
     --card: #f8f4ea;
     --card-bright: #fffdf4;
@@ -47,16 +47,19 @@
     text-rendering: optimizeLegibility;
   }
 
-  /* Moonlight: a warm glow breaking the surface, and a cooler counter-glow. */
+  /* Moonlight, kept faint, then a vignette pulling every edge toward black:
+     the scene stays a scene, but the room reads dark and the cards carry
+     the light. */
   body::before {
     content: "";
     position: fixed;
     inset: 0;
     z-index: -1;
     background:
-      radial-gradient(48rem 30rem at 50% -14%, rgba(246, 223, 164, 0.17), transparent 62%),
-      radial-gradient(30rem 22rem at 82% -8%, rgba(126, 190, 212, 0.1), transparent 60%),
-      radial-gradient(70rem 40rem at 50% 118%, rgba(2, 6, 10, 0.7), transparent 70%);
+      radial-gradient(48rem 30rem at 50% -14%, rgba(246, 223, 164, 0.09), transparent 62%),
+      radial-gradient(30rem 22rem at 82% -8%, rgba(126, 190, 212, 0.05), transparent 60%),
+      radial-gradient(70rem 40rem at 50% 118%, rgba(1, 4, 8, 0.82), transparent 70%),
+      radial-gradient(130% 95% at 50% 38%, transparent 48%, rgba(1, 4, 8, 0.62) 100%);
   }
 
   /* Film grain: keeps the water from ever looking like a flat gradient. */
@@ -511,17 +514,20 @@
   position: absolute;
   top: -14%;
   height: 72vh;
-  background: linear-gradient(180deg, rgba(246, 223, 164, 0.12), transparent 78%);
-  filter: blur(7px);
+  background: linear-gradient(180deg, rgba(246, 223, 164, 0.07), transparent 78%);
+  filter: blur(9px);
   transform-origin: top center;
   animation: ray-sway 10s ease-in-out infinite alternate;
 }
 
-/* Kelp anchored to the sea floor, swaying from the root. */
+/* Kelp anchored to the sea floor, swaying from the root. Slightly blurred
+   and dimmed: scenery sits behind a breath of water, cards stay sharp. */
 .kelp {
   position: absolute;
   bottom: -6px;
   transform-origin: bottom center;
+  opacity: 0.72;
+  filter: blur(1.6px) brightness(0.8);
   animation: kelp-sway 9s ease-in-out infinite alternate;
 }
 
@@ -531,31 +537,36 @@
   bottom: 0;
   left: 0;
   right: 0;
+  opacity: 0.85;
+  filter: blur(1.2px) brightness(0.72);
 }
 
 .bubble {
   position: absolute;
   bottom: -3rem;
   border-radius: 999px;
-  border: 1.5px solid rgba(244, 241, 234, 0.34);
+  border: 1.5px solid rgba(244, 241, 234, 0.2);
   background: radial-gradient(
     circle at 32% 30%,
-    rgba(244, 241, 234, 0.3),
-    rgba(244, 241, 234, 0.04) 62%
+    rgba(244, 241, 234, 0.16),
+    rgba(244, 241, 234, 0.03) 62%
   );
+  filter: blur(0.4px);
   animation: bubble-rise linear infinite;
 }
 
 /* Small lives drifting across the mid-water. */
 .school {
   position: absolute;
+  filter: blur(1px);
   animation: swim-across linear infinite;
-  opacity: 0.14;
+  opacity: 0.1;
 }
 .seal {
   position: absolute;
+  filter: blur(1.4px);
   animation: swim-across linear infinite;
-  opacity: 0.1;
+  opacity: 0.08;
 }
 
 @keyframes ray-sway {
