@@ -55,6 +55,7 @@ Character count is close to the existing field, so it should drop straight in.
 | Ask a handle for money | Live, settles only on the payer's approval | Requests tab, or `request 10 CC from @ada` in the bot |
 | Reward campaign to a list | Live over HTTP and Telegram | Campaign tab, or `/campaign` in the bot |
 | Real cBTC on devnet | Settled, 2.0 CBTC held | `curl localhost:4000/api/reserve` |
+| Fund from an outside Canton wallet | Live, receives at one party with a handle tag | Deposit tab |
 | Private receipts | Enforced by the ledger, not the UI | Open another account's `/tx/:id`, get 404 |
 | Telegram | @selkiepay_bot is live | Message it |
 | X sign in | Real OAuth2 PKCE against Martin's X app | `/auth/x/login` |
@@ -82,8 +83,8 @@ the ledger is unreachable rather than reporting a comfortable zero.
 
 **Engineering state**
 
-- 64 tests green against a live Canton 3.5.9 participant: 44 in the bot
-  including a twelve test live integration suite, 20 in the server including
+- 70 tests green against a live Canton 3.5.9 participant: 44 in the bot
+  including a twelve test live integration suite, 26 in the server including
   a twenty winner campaign over HTTP.
 - A payment request is a contract, not a message. Asking moves nothing; the
   payer's approval is a single transaction that creates the transfer and
@@ -106,6 +107,16 @@ the ledger is unreachable rather than reporting a comfortable zero.
   then the multi party privacy demo runs on LocalNet, where we are admin.
 - Escrow and bill splitting are designed but not built. The old pitch
   promised them. This one does not.
+- Custody is honest but not final. Selkie receives every deposit at one
+  Canton party and tracks who owns what in its own contracts, which is an
+  omnibus model, not a per user address. That is a consequence of the shared
+  devnet node, where our user can act only for its own party and cannot
+  allocate more. On a validator we run, and on LocalNet today, every handle
+  already gets its own real Canton party, and that is the path to per user
+  deposit addresses on mainnet.
+- Withdrawal to an outside wallet is the other half of this and is not built
+  yet. The send path itself is proven, since a cBTC transfer was settled
+  through `TransferFactory_Transfer`.
 
 ---
 
@@ -236,4 +247,10 @@ Next entry, for the day after:
 > bot was answering its own advertised command with a promise. Wiring what
 > you already built beats starting something new.
 >
-> 64 tests green against a live Canton 3.5.9 participant.
+> Also opened the door the other way. Until today money could only appear in
+> Selkie because Selkie put it there. Now the wallet has an address on Canton
+> devnet, and a transfer sent to it with your handle in the metadata becomes
+> your balance once it is accepted. A transfer that names nobody is shown and
+> left alone, because guessing who real money belongs to is not a feature.
+>
+> 70 tests green against a live Canton 3.5.9 participant.
