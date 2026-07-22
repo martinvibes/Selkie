@@ -1,4 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
+import { LogOut } from "lucide-react";
 import { Link } from "react-router-dom";
 import { LoaderMark, Mark, Wordmark, XLogo } from "./Mark";
 import { useAuth } from "../contexts/useAuth";
@@ -39,20 +41,25 @@ function SignOutModal({ handle, onClose }: { handle: string; onClose: () => void
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
-  return (
+  // Portaled to <body>: the header's backdrop-blur makes it the containing
+  // block for fixed descendants, which would clip the overlay to the header.
+  return createPortal(
     <div className="overlay" onClick={onClose}>
       <div
-        className="modal glass-strong p-7"
+        className="modal p-7"
         role="dialog"
         aria-modal="true"
         aria-label="Sign out"
         onClick={(e) => e.stopPropagation()}
       >
-        <p className="font-display text-xl font-semibold">Sign out of {handle}?</p>
-        <p className="mt-2 text-sm leading-relaxed text-ivory/55">
+        <span className="modal-icon">
+          <LogOut size={20} strokeWidth={2.2} />
+        </span>
+        <p className="mt-5 font-display text-2xl font-bold tracking-tight">Sign out of {handle}?</p>
+        <p className="mt-2 text-[15px] leading-relaxed text-ivory/60">
           Your wallet stays safe on Canton. Signing back in with X brings it right back.
         </p>
-        <div className="mt-6 flex gap-3">
+        <div className="mt-7 flex gap-3">
           <button onClick={onClose} autoFocus className="btn btn-dim flex-1">
             Cancel
           </button>
@@ -61,7 +68,8 @@ function SignOutModal({ handle, onClose }: { handle: string; onClose: () => void
           </a>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
