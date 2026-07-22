@@ -35,9 +35,10 @@ Submission closes **2026-07-26 21:59 UTC**. The project is currently in
 > everyone else, including a signed in stranger, and a handle's public page
 > proves only that it can be paid.
 >
-> Working today on Canton 3.5.9: one tap sign in, pay any handle, pay a
-> whole list of winners at once, and a live cBTC reserve settled through the
-> CIP-56 token standard on the shared devnet node.
+> Working today on Canton 3.5.9: one tap sign in, pay any handle, ask a
+> handle to pay you, pay a whole list of winners at once, and a live cBTC
+> reserve settled through the CIP-56 token standard on the shared devnet
+> node.
 
 Character count is close to the existing field, so it should drop straight in.
 
@@ -51,6 +52,7 @@ Character count is close to the existing field, so it should drop straight in.
 | --- | --- | --- |
 | Handle to wallet, no setup | Live on Canton 3.5.9 | `node bot/scripts/demo-chat.mjs` |
 | Pay a handle with no account | Live, wallet created in the same transaction | 20 winners paid, 20 onboarded, 0 unclaimed |
+| Ask a handle for money | Live, settles only on the payer's approval | Requests tab, or `request 10 CC from @ada` in the bot |
 | Reward campaign to a list | Live over HTTP and Telegram | Campaign tab, or `/campaign` in the bot |
 | Real cBTC on devnet | Settled, 2.0 CBTC held | `curl localhost:4000/api/reserve` |
 | Private receipts | Enforced by the ledger, not the UI | Open another account's `/tx/:id`, get 404 |
@@ -80,9 +82,14 @@ the ledger is unreachable rather than reporting a comfortable zero.
 
 **Engineering state**
 
-- 53 tests green against a live Canton 3.5.9 participant: 35 in the bot
-  including an eight test live integration suite, 18 in the server including
+- 64 tests green against a live Canton 3.5.9 participant: 44 in the bot
+  including a twelve test live integration suite, 20 in the server including
   a twenty winner campaign over HTTP.
+- A payment request is a contract, not a message. Asking moves nothing; the
+  payer's approval is a single transaction that creates the transfer and
+  executes it, so there is no window where the money is neither theirs nor
+  yours. Only the named payer can approve, and the ledger enforces that, not
+  our server.
 - Ported from the Daml 2.x sandbox to Canton 3. That meant Daml-LF 2.x,
   losing contract keys entirely, and rewriting the client for JSON Ledger
   API v2. The one handle equals one wallet invariant now comes from an
@@ -97,8 +104,8 @@ the ledger is unreachable rather than reporting a comfortable zero.
 - Per user parties on the shared devnet node need the operator to upload our
   DAR and allocate parties. Our user has actAs on its own party only. Until
   then the multi party privacy demo runs on LocalNet, where we are admin.
-- Escrow, payment requests and bill splitting are designed but not built.
-  The old pitch promised them. This one does not.
+- Escrow and bill splitting are designed but not built. The old pitch
+  promised them. This one does not.
 
 ---
 
@@ -141,19 +148,24 @@ darkens. Voiceover: "Paying someone in crypto means asking them to install a
 wallet, save twelve words and buy gas. Between twenty and forty percent of
 reward money is never claimed. Selkie deletes that step."
 
-**0:20 to 0:50, one tap in.** Click Continue with X, land on the wallet.
+**0:20 to 0:45, one tap in.** Click Continue with X, land on the wallet.
 "My handle is my wallet. No install, no seed phrase, no gas."
 
-**0:50 to 1:30, pay someone who does not exist yet.** Send tab, pay a handle
+**0:45 to 1:20, pay someone who does not exist yet.** Send tab, pay a handle
 that has never used Selkie. Open the receipt. "Their wallet was created
 inside the same transaction that paid them. There was nothing to claim."
 
-**1:30 to 2:05, privacy is the ledger's job.** Copy the receipt link, open it
+**1:20 to 1:40, money goes both ways.** Requests tab, ask a handle for 3 CC,
+then switch accounts and tap Pay. "Asking moves nothing. Approving is one
+transaction that creates the transfer and settles it, so the money is never
+in limbo, and only the person I asked can approve it."
+
+**1:40 to 2:10, privacy is the ledger's job.** Copy the receipt link, open it
 from another signed in account, show the refusal. "On Canton a payment is
 visible only to the two people in it. This is not a UI rule. The ledger
 enforces it."
 
-**2:05 to 2:35, real cBTC.** Show the reserve line on the dashboard, then
+**2:10 to 2:35, real cBTC.** Show the reserve line on the dashboard, then
 `curl localhost:4000/api/reserve` in a terminal. "Two real cBTC, settled
 through the CIP-56 token standard on the HackCanton devnet node. This number
 is read from the ledger, not typed by us."
@@ -205,3 +217,23 @@ Telegram Bot API, X OAuth2 PKCE, Docker.
 > rises, the water darkens, and a gauge on the right counts how deep you are.
 >
 > 53 tests green against a live Canton 3.5.9 participant.
+
+Next entry, for the day after:
+
+> Money now goes both ways. Until today Selkie could only push: you paid a
+> handle. Now a handle can ask you, and that ask is a contract rather than a
+> message. Asking moves nothing. The payer's approval is a single transaction
+> that creates the transfer and executes it, so there is no moment where the
+> money belongs to neither side, and the ledger itself refuses an approval
+> from anyone who is not the person who was asked.
+>
+> It is live on both surfaces from the same code: `request 10 CC from @ada`,
+> `requests` and `approve` in Telegram, and a Requests tab in the wallet with
+> a badge for how many people are waiting on you.
+>
+> The honest part of the story is that the template had been sitting compiled
+> and deployed on the ledger for days with nothing able to reach it, and the
+> bot was answering its own advertised command with a promise. Wiring what
+> you already built beats starting something new.
+>
+> 64 tests green against a live Canton 3.5.9 participant.
