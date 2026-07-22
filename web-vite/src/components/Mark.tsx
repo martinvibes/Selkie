@@ -1,4 +1,3 @@
-import { useRef } from "react";
 import { Link } from "react-router-dom";
 
 /** The echo-send mark: three arrows, each a fainter echo of the last. */
@@ -22,55 +21,18 @@ export function Mark({ size = 26 }: { size?: number }) {
 
 export function Wordmark({ to = "/" }: { to?: string }) {
   return (
-    <Link to={to} className="flex items-center gap-2.5">
-      <Mark />
-      <span className="font-body text-xs font-extrabold tracking-mark">SELKIE</span>
+    <Link to={to} className="flex items-center gap-2.5" aria-label="Selkie home">
+      <Mark size={24} />
+      <span className="font-display text-[1.05rem] font-semibold tracking-tight">Selkie</span>
     </Link>
   );
 }
 
-/**
- * The 3D echo hero: a floating gold medallion carrying the mark, sonar-like
- * echo rings radiating out, and a soft glow beneath. Tilts toward the cursor
- * so the whole thing reads as an object lit from below, not a flat logo.
- */
-export function EchoHero() {
-  const medallion = useRef<HTMLDivElement>(null);
-
-  function tilt(e: React.MouseEvent<HTMLDivElement>) {
-    const el = medallion.current;
-    if (!el) return;
-    const r = e.currentTarget.getBoundingClientRect();
-    const x = (e.clientX - r.left) / r.width - 0.5;
-    const y = (e.clientY - r.top) / r.height - 0.5;
-    el.style.transform = `rotateY(${x * 18}deg) rotateX(${-y * 18}deg)`;
-  }
-  function reset() {
-    if (medallion.current) medallion.current.style.transform = "";
-  }
-
+/** The X logo, for "Continue with X". */
+export function XLogo({ size = 15 }: { size?: number }) {
   return (
-    <div className="echo-stage" onMouseMove={tilt} onMouseLeave={reset}>
-      <span className="echo-glow" />
-      <span className="echo-ring" />
-      <span className="echo-ring" style={{ animationDelay: "1.2s" }} />
-      <span className="echo-ring" style={{ animationDelay: "2.4s" }} />
-
-      <div ref={medallion} className="echo-medallion">
-        <svg width="52%" viewBox="0 0 64 64" aria-hidden="true" style={{ overflow: "visible" }}>
-          <defs>
-            <linearGradient id="hero-mark" x1="0" y1="0" x2="1" y2="1">
-              <stop offset="0" stopColor="#F6DFA4" />
-              <stop offset="1" stopColor="#C9964B" />
-            </linearGradient>
-          </defs>
-          <g strokeLinejoin="round" strokeWidth="6">
-            <path d="M 9 17 L 9 47 L 35 32 Z" fill="#F2EBDC" stroke="#F2EBDC" opacity="0.2" />
-            <path d="M 19 17 L 19 47 L 45 32 Z" fill="#F2EBDC" stroke="#F2EBDC" opacity="0.45" />
-            <path d="M 29 17 L 29 47 L 55 32 Z" fill="url(#hero-mark)" stroke="url(#hero-mark)" />
-          </g>
-        </svg>
-      </div>
-    </div>
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231 5.45-6.231Zm-1.161 17.52h1.833L7.084 4.126H5.117l11.966 15.644Z" />
+    </svg>
   );
 }

@@ -1,10 +1,14 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { ArrowRight, Lock } from "lucide-react";
-import { Frame, Header, Shell, Spinner, Waterline } from "../components/Layout";
-import { Mark } from "../components/Mark";
+import { ArrowRight, AtSign, Lock } from "lucide-react";
+import { Header, Shell, Spinner } from "../components/Layout";
+import { XLogo } from "../components/Mark";
+import { TokenIcon } from "../components/TokenIcon";
 import { api, type PublicAccount } from "../lib/api";
 import { useAuth } from "../contexts/useAuth";
+
+/** The redaction rows: proof there is a wallet here, with nothing readable. */
+const PRIVATE_ROWS = ["CC", "USDCX", "CBTC", "CETH"];
 
 /**
  * A handle's public page: shareable like a payment link.
@@ -38,54 +42,58 @@ export function Account() {
   const isMe = me?.handle === shown;
 
   return (
-    <Frame>
+    <>
       <Header />
-      <main className="flex min-h-[calc(100vh-6rem)] flex-col justify-center py-10">
+      <main className="flex min-h-[calc(100vh-4rem)] flex-col justify-center py-12">
         <Shell>
-          <div className="card-strong card-pad mx-auto max-w-md animate-rise text-center">
-            <span className="mx-auto inline-flex h-16 w-16 items-center justify-center rounded-2xl border-2 border-ink bg-gold-light shadow-neo-sm">
-              <Mark size={34} />
+          <div className="glass-strong mx-auto w-full max-w-md animate-rise overflow-hidden p-8 text-center sm:p-10">
+            <span className="orb -top-32 left-1/2 h-72 w-72 -translate-x-1/2 bg-gold/15" />
+
+            <span className="mx-auto grid h-16 w-16 place-items-center rounded-full border border-gold/30 bg-gradient-to-br from-white/10 to-white/[0.02] text-gold-light">
+              <AtSign size={26} />
             </span>
 
-            <p className="eyebrow mt-5">On the surface</p>
-            <h1 className="mt-2 font-display text-[clamp(2rem,8vw,3rem)] font-extrabold uppercase">
+            <h1 className="mt-5 font-display text-[clamp(1.9rem,7vw,2.6rem)] font-bold tracking-tight">
               {shown}
             </h1>
-
-            <div className="my-5">
-              <Waterline full />
-            </div>
-
-            <p className="eyebrow text-gold-light/50">Beneath it</p>
-            <p className="mx-auto mt-3 max-w-xs text-ivory/80">
-              Private. Only {shown} can see what's here.
-            </p>
-            <p className="mx-auto mt-3 max-w-sm text-xs leading-relaxed text-muted">
+            <p className="mt-2 text-sm text-ivory/50">
               {account?.exists
-                ? "This handle has a Selkie wallet and can be paid right now."
-                : "This handle has no wallet yet. Send something and Selkie creates one as it settles."}
+                ? "Has a Selkie wallet and can be paid right now."
+                : "No wallet yet. The first payment creates it."}
+            </p>
+
+            <div className="glow-line my-6" />
+
+            <ul className="mx-auto max-w-[15rem] text-left">
+              {PRIVATE_ROWS.map((asset) => (
+                <li key={asset} className="flex items-center gap-3 py-2">
+                  <TokenIcon asset={asset} size={24} />
+                  <span className="h-3.5 w-24 rounded-full bg-ivory/20 blur-[5px]" aria-hidden="true" />
+                  <Lock size={11} className="ml-auto text-ivory/30" />
+                </li>
+              ))}
+            </ul>
+            <p className="mx-auto mt-3 max-w-xs text-xs leading-relaxed text-ivory/40">
+              Balances are private on Canton. Only {shown} can see them.
             </p>
 
             <div className="mt-7">
               {me ? (
                 <a
                   href={isMe ? "/dashboard/activity" : `/dashboard/send?to=${shown.replace("@", "")}`}
-                  className="btn-primary"
+                  className="btn btn-gold"
                 >
                   {isMe ? "Go to your wallet" : `Send to ${shown}`} <ArrowRight size={16} />
                 </a>
               ) : (
-                <a href="/auth/x/login" className="btn-primary">
-                  Continue with X to send <ArrowRight size={16} />
+                <a href="/auth/x/login" className="btn btn-gold">
+                  <XLogo size={14} /> Continue with X to send
                 </a>
               )}
             </div>
-            <p className="mt-4 flex items-center justify-center gap-2 text-xs text-muted">
-              <Lock size={12} /> No public balance, ever.
-            </p>
           </div>
         </Shell>
       </main>
-    </Frame>
+    </>
   );
 }

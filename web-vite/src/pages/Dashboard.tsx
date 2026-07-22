@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
-import { Navigate, NavLink, useParams, useSearchParams, Link } from "react-router-dom";
-import { ArrowDownLeft, ArrowUpRight, Sparkles } from "lucide-react";
-import { Frame, Header, Shell, Spinner, Waterline } from "../components/Layout";
+import { Link, Navigate, NavLink, useParams, useSearchParams } from "react-router-dom";
+import { ArrowDownLeft, ArrowUpRight, Check, Inbox, Link2, Lock, Sparkles } from "lucide-react";
+import { Avatar, Header, Shell, Spinner } from "../components/Layout";
 import { TokenIcon } from "../components/TokenIcon";
 import { useAuth } from "../contexts/useAuth";
 import { api, type Activity, type CampaignResult, type SendResult } from "../lib/api";
@@ -13,7 +13,28 @@ const TABS = [
   { id: "campaign", label: "Pay many" },
 ] as const;
 
-/** Segmented token picker: a bright chip per asset, ink-on-gold when chosen. */
+/** Copyable pay page link: the shareable half of "your handle is your wallet". */
+function PayLink({ handle }: { handle: string }) {
+  const [copied, setCopied] = useState(false);
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(`${location.origin}/account/${handle.replace(/^@/, "")}`);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1600);
+    } catch {
+      /* clipboard can be unavailable; the button just stays quiet */
+    }
+  }
+
+  return (
+    <button onClick={copy} className="btn btn-dim btn-sm ml-auto shrink-0">
+      {copied ? <Check size={14} /> : <Link2 size={14} />}
+      {copied ? "Copied" : "Pay link"}
+    </button>
+  );
+}
+
 function AssetPicker({
   assets,
   value,
@@ -25,24 +46,18 @@ function AssetPicker({
 }) {
   return (
     <div className="flex flex-wrap gap-2">
-      {assets.map((a) => {
-        const active = a === value;
-        return (
-          <button
-            type="button"
-            key={a}
-            onClick={() => onChange(a)}
-            className={`flex items-center gap-2 rounded-full border-2 px-3 py-1.5 text-xs font-extrabold transition ${
-              active
-                ? "border-ink bg-gold-light text-ink shadow-neo-sm"
-                : "border-line/30 text-muted hover:border-line hover:text-ivory"
-            }`}
-          >
-            <TokenIcon asset={a} size={20} />
-            {ASSET_LABEL[a] ?? a}
-          </button>
-        );
-      })}
+      {assets.map((a) => (
+        <button
+          type="button"
+          key={a}
+          onClick={() => onChange(a)}
+          className={`chip ${a === value ? "chip-on" : ""}`}
+          aria-pressed={a === value}
+        >
+          <TokenIcon asset={a} size={20} />
+          {ASSET_LABEL[a] ?? a}
+        </button>
+      ))}
     </div>
   );
 }
@@ -50,25 +65,29 @@ function AssetPicker({
 function Balances({ assets, balances }: { assets: string[]; balances: Record<string, number> }) {
   const empty = assets.every((a) => !balances[a]);
   return (
-    <section className="card-strong card-pad">
-      <p className="eyebrow">Beneath the surface · private balances</p>
-      <ul className="mt-4 grid gap-3">
+    <section className="glass-strong mt-8 p-6 sm:p-7">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="font-display text-lg font-semibold">Balances</p>
+        <span className="flex items-center gap-1.5 text-xs text-ivory/40">
+          <Lock size={12} /> Only you can see these
+        </span>
+      </div>
+
+      <ul className="mt-3">
         {assets.map((asset, i) => {
           const amount = balances[asset] ?? 0;
           return (
             <li
               key={asset}
-              className="flex animate-rise items-center gap-3 border-b border-ivory/10 pb-3 last:border-0 last:pb-0"
-              style={{ animationDelay: `${60 + i * 60}ms` }}
+              className="flex animate-rise items-center gap-3.5 border-b border-white/[0.05] py-3.5 last:border-0 last:pb-0"
+              style={{ animationDelay: `${i * 60}ms` }}
             >
-              <TokenIcon asset={asset} size={40} />
-              <span className="font-display text-lg font-extrabold">{ASSET_LABEL[asset] ?? asset}</span>
+              <TokenIcon asset={asset} size={38} />
+              <div className="leading-tight">
+                <p className="text-[15px] font-semibold">{ASSET_LABEL[asset] ?? asset}</p>
+              </div>
               <span
-                className={
-                  amount === 0
-                    ? "num ml-auto text-[clamp(1.35rem,5vw,1.9rem)] font-medium text-ivory/25"
-                    : "value ml-auto text-[clamp(1.35rem,5vw,1.9rem)] font-medium"
-                }
+                className={`num ml-auto text-[1.45rem] font-medium ${amount === 0 ? "text-ivory/25" : ""}`}
               >
                 {money(amount)}
               </span>
@@ -76,10 +95,12 @@ function Balances({ assets, balances }: { assets: string[]; balances: Record<str
           );
         })}
       </ul>
-      <p className="mt-4 text-xs leading-relaxed text-muted">
-        Only you, the person you paid, and the operator can see these amounts. Nothing here is public.
-        {empty && " Your wallet fills the moment someone sends you something."}
-      </p>
+
+      {empty && (
+        <p className="mt-4 text-[13px] text-ivory/40">
+          Your wallet fills the moment someone sends you something.
+        </p>
+      )}
     </section>
   );
 }
@@ -87,50 +108,66 @@ function Balances({ assets, balances }: { assets: string[]; balances: Record<str
 function ActivityFeed({ entries }: { entries: Activity[] }) {
   if (!entries.length) {
     return (
-      <div className="card-pad text-center">
-        <p className="text-sm text-muted">No payments yet. Send one and it shows up here.</p>
+      <div className="glass p-10 text-center">
+        <span className="mx-auto grid h-12 w-12 place-items-center rounded-full border border-white/10 bg-white/[0.04] text-ivory/35">
+          <Inbox size={20} />
+        </span>
+        <p className="mt-4 font-medium">No payments yet.</p>
+        <p className="mt-1 text-sm text-ivory/45">Send one and it shows up here.</p>
       </div>
     );
   }
+
   return (
-    <ul className="card">
+    <ul className="glass overflow-hidden">
       {entries.map((e) => {
         const inbound = e.direction === "in";
         const row = (
           <>
             <span
-              className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border-2 border-ink ${
-                inbound ? "bg-usdcx" : "bg-raised text-ivory"
+              className={`grid h-9 w-9 shrink-0 place-items-center rounded-full border ${
+                inbound
+                  ? "border-emerald-400/25 bg-emerald-400/10 text-emerald-300"
+                  : "border-white/10 bg-white/[0.04] text-ivory/50"
               }`}
             >
-              {inbound ? <ArrowDownLeft size={16} /> : <ArrowUpRight size={16} />}
+              {inbound ? <ArrowDownLeft size={15} /> : <ArrowUpRight size={15} />}
             </span>
-            <span className="num font-semibold">{money(e.amount)}</span>
-            <span className="text-xs font-bold tracking-wider text-muted">
-              {ASSET_LABEL[e.asset] ?? e.asset}
-            </span>
-            <span className="text-sm text-muted">{inbound ? `from ${e.from}` : `to ${e.to}`}</span>
-            {!inbound && e.onboarded && (
-              <span className="rounded-full border-2 border-ink bg-gold-light px-2 py-0.5 text-[0.625rem] font-extrabold uppercase tracking-wide text-ink">
-                new wallet
-              </span>
-            )}
-            <span className="ml-auto hidden text-xs text-muted sm:inline">
-              {e.memo || timeAgo(e.ts)}
-            </span>
+
+            <TokenIcon asset={e.asset} size={28} />
+
+            <div className="min-w-0 flex-1 leading-snug">
+              <p className="flex items-baseline gap-2">
+                <span className="num text-[15px] font-semibold">
+                  {inbound ? "+" : "−"}
+                  {money(e.amount)}
+                </span>
+                <span className="text-[13px] text-ivory/45">{ASSET_LABEL[e.asset] ?? e.asset}</span>
+                {!inbound && e.onboarded && (
+                  <span className="text-xs font-medium text-gold-light/80">new wallet</span>
+                )}
+              </p>
+              <p className="truncate text-[13px] text-ivory/45">
+                {inbound ? `from ${e.from}` : `to ${e.to}`}
+                {e.memo ? ` · ${e.memo}` : ""}
+              </p>
+            </div>
+
+            <span className="shrink-0 text-xs text-ivory/35">{timeAgo(e.ts)}</span>
           </>
         );
+
         return (
-          <li key={e.id ?? `${e.ts}-${e.to}`} className="border-b-2 border-ink/60 last:border-0">
+          <li key={e.id ?? `${e.ts}-${e.to}`} className="border-b border-white/[0.05] last:border-0">
             {e.id ? (
               <Link
                 to={`/tx/${e.id}`}
-                className="flex items-center gap-3 px-5 py-3.5 transition hover:bg-raised/60"
+                className="flex items-center gap-3.5 px-5 py-4 transition hover:bg-white/[0.03]"
               >
                 {row}
               </Link>
             ) : (
-              <div className="flex items-center gap-3 px-5 py-3.5">{row}</div>
+              <div className="flex items-center gap-3.5 px-5 py-4">{row}</div>
             )}
           </li>
         );
@@ -139,19 +176,17 @@ function ActivityFeed({ entries }: { entries: Activity[] }) {
   );
 }
 
-function Result({ children }: { children: React.ReactNode }) {
+function ErrorNote({ children }: { children: React.ReactNode }) {
   return (
-    <div className="animate-rise rounded-2xl border-2 border-gold-light/40 bg-gold-light/[0.07] p-5 shadow-neo-sm">
+    <p className="rounded-xl border border-rose-400/30 bg-rose-400/10 px-4 py-3 text-sm text-rose-200">
       {children}
-    </div>
+    </p>
   );
 }
 
-function ErrorNote({ children }: { children: React.ReactNode }) {
+function ResultNote({ children }: { children: React.ReactNode }) {
   return (
-    <p className="rounded-xl border-2 border-orange-400/40 bg-orange-400/10 px-4 py-3 text-sm text-orange-100">
-      {children}
-    </p>
+    <div className="animate-rise rounded-2xl border border-gold/30 bg-gold/[0.07] p-5">{children}</div>
   );
 }
 
@@ -195,16 +230,16 @@ function SendPanel({
   }
 
   return (
-    <form onSubmit={submit} className="card card-pad grid gap-5">
+    <form onSubmit={submit} className="glass grid gap-5 p-6 sm:p-7">
       <div className="grid gap-2">
         <label className="label" htmlFor="to">
           To
         </label>
         <div className="relative flex items-center">
-          <span className="pointer-events-none absolute left-4 font-bold text-muted">@</span>
+          <span className="pointer-events-none absolute left-4 text-ivory/35">@</span>
           <input
             id="to"
-            className="field pl-8"
+            className="field pl-9"
             value={to}
             onChange={(e) => setTo(e.target.value)}
             placeholder="handle"
@@ -212,7 +247,7 @@ function SendPanel({
             spellCheck={false}
           />
         </div>
-        <p className="text-xs text-muted">
+        <p className="text-[13px] text-ivory/40">
           They don't need an account. If they've never used Selkie, this creates their wallet.
         </p>
       </div>
@@ -232,14 +267,14 @@ function SendPanel({
         />
       </div>
 
-      <div className="grid gap-2">
+      <div className="grid gap-2.5">
         <span className="label">Asset</span>
         <AssetPicker assets={assets} value={asset} onChange={setAsset} />
       </div>
 
       <div className="grid gap-2">
         <label className="label" htmlFor="memo">
-          Note <span className="font-medium normal-case tracking-normal text-muted">optional</span>
+          Note <span className="text-ivory/35">(optional)</span>
         </label>
         <input
           id="memo"
@@ -252,14 +287,14 @@ function SendPanel({
         />
       </div>
 
-      <button className="btn-primary w-full" disabled={busy} type="submit">
-        {busy ? "Sending…" : "Send"}
+      <button className="btn btn-gold w-full" disabled={busy} type="submit">
+        {busy ? "Sending…" : "Send payment"}
       </button>
 
       {error && <ErrorNote>{error}</ErrorNote>}
 
       {result && (
-        <Result>
+        <ResultNote>
           <p>
             Sent{" "}
             <span className="num font-semibold text-gold-light">
@@ -267,12 +302,12 @@ function SendPanel({
             </span>{" "}
             to <strong>{result.to}</strong>.
           </p>
-          <p className="mt-2 text-sm text-muted">
+          <p className="mt-2 text-sm text-ivory/55">
             {result.onboarded
               ? `${result.to} had no wallet. Selkie made one, and the money is already theirs.`
               : "Settled on Canton. The amount stays between you two."}
           </p>
-        </Result>
+        </ResultNote>
       )}
     </form>
   );
@@ -311,7 +346,7 @@ function CampaignPanel({ assets, onDone }: { assets: string[]; onDone: () => voi
   }
 
   return (
-    <form onSubmit={submit} className="card card-pad grid gap-5">
+    <form onSubmit={submit} className="glass grid gap-5 p-6 sm:p-7">
       <div className="grid gap-2">
         <label className="label" htmlFor="winners">
           Winners
@@ -323,9 +358,9 @@ function CampaignPanel({ assets, onDone }: { assets: string[]; onDone: () => voi
           onChange={(e) => setRaw(e.target.value)}
           placeholder={"@ada @bayo @chidi\none per line, or separated by spaces"}
         />
-        <p className="text-xs text-muted">
-          <span className="num text-ivory/80">{winners.length}</span> handles. Each one gets the amount
-          below.
+        <p className="text-[13px] text-ivory/40">
+          <span className="num text-ivory/70">{winners.length}</span> handles. Each one gets the
+          amount below.
         </p>
       </div>
 
@@ -344,14 +379,14 @@ function CampaignPanel({ assets, onDone }: { assets: string[]; onDone: () => voi
         />
       </div>
 
-      <div className="grid gap-2">
+      <div className="grid gap-2.5">
         <span className="label">Asset</span>
         <AssetPicker assets={assets} value={asset} onChange={setAsset} />
       </div>
 
       <div className="grid gap-2">
         <label className="label" htmlFor="campaign-memo">
-          Note <span className="font-medium normal-case tracking-normal text-muted">optional</span>
+          Note <span className="text-ivory/35">(optional)</span>
         </label>
         <input
           id="campaign-memo"
@@ -364,32 +399,40 @@ function CampaignPanel({ assets, onDone }: { assets: string[]; onDone: () => voi
         />
       </div>
 
-      <button className="btn-primary w-full" disabled={busy} type="submit">
-        {busy ? `Paying ${winners.length}…` : winners.length ? `Pay ${winners.length}` : "Pay everyone"}
+      <button className="btn btn-gold w-full" disabled={busy} type="submit">
+        {busy
+          ? `Paying ${winners.length}…`
+          : winners.length
+            ? `Pay ${winners.length} ${winners.length === 1 ? "winner" : "winners"}`
+            : "Pay everyone"}
       </button>
 
       {error && <ErrorNote>{error}</ErrorNote>}
 
       {result && (
-        <Result>
-          <div className="flex flex-wrap gap-8">
-            {[
-              ["paid", result.paid],
-              ["onboarded", result.onboarded],
-              ["unclaimed", result.failed.length],
-            ].map(([label, value]) => (
-              <div key={label as string} className="grid gap-1">
+        <ResultNote>
+          <div className="flex flex-wrap gap-10">
+            {(
+              [
+                ["paid", result.paid],
+                ["onboarded", result.onboarded],
+                ["unclaimed", result.failed.length],
+              ] as const
+            ).map(([label, value]) => (
+              <div key={label} className="grid gap-1">
                 <span className="num text-4xl font-medium leading-none text-gold-light">{value}</span>
-                <span className="label">{label}</span>
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-ivory/40">
+                  {label}
+                </span>
               </div>
             ))}
           </div>
-          <p className="mt-4 text-sm text-muted">
+          <p className="mt-4 text-sm text-ivory/55">
             {result.failed.length
               ? result.failed.map((f) => `${f.handle}: ${f.error}`).join(" · ")
               : "Every winner was paid. Nobody had to claim anything."}
           </p>
-        </Result>
+        </ResultNote>
       )}
     </form>
   );
@@ -420,54 +463,49 @@ export function Dashboard() {
   const presetTo = search.get("to") ?? undefined;
 
   return (
-    <Frame>
+    <>
       <Header />
-      <main className="pb-20">
+      <main className="pb-24 pt-10">
         <Shell>
-          <section className="pt-4">
-            <p className="eyebrow">Your handle, on the surface</p>
-            <h1 className="mt-1.5 font-display text-[clamp(1.75rem,7vw,2.75rem)] font-extrabold uppercase">
-              {me.handle}
-            </h1>
-          </section>
-        </Shell>
+          <div className="flex items-center gap-4">
+            <Avatar me={me} size={52} />
+            <div className="leading-tight">
+              <p className="eyebrow">Private wallet</p>
+              <h1 className="mt-1 font-display text-3xl font-bold tracking-tight sm:text-4xl">
+                {me.handle}
+              </h1>
+            </div>
+            <PayLink handle={me.handle} />
+          </div>
 
-        <div className="my-5">
-          <Waterline />
-        </div>
-
-        <Shell>
           <Balances assets={me.assets} balances={balances} />
 
-          <nav
-            className="mt-8 flex flex-wrap gap-1 rounded-full border-2 border-line/20 bg-black/25 p-1"
-            role="tablist"
-          >
+          <nav className="seg mt-9" role="tablist">
             {TABS.map((t) => (
               <NavLink
                 key={t.id}
                 to={`/dashboard/${t.id}`}
                 role="tab"
-                className={({ isActive }) => `tab ${isActive ? "tab-active" : ""}`}
+                className={({ isActive }) => `seg-item ${isActive ? "seg-on" : ""}`}
               >
                 {t.label}
               </NavLink>
             ))}
           </nav>
 
-          <div className="mt-4">
+          <div className="mt-5">
             {tab === "activity" && <ActivityFeed entries={entries} />}
             {tab === "send" && <SendPanel assets={me.assets} presetTo={presetTo} onDone={refresh} />}
             {tab === "campaign" && <CampaignPanel assets={me.assets} onDone={refresh} />}
           </div>
 
           {tab === "activity" && entries.length > 0 && (
-            <p className="mt-4 flex items-center gap-2 text-xs text-muted">
+            <p className="mt-4 flex items-center gap-2 text-[13px] text-ivory/40">
               <Sparkles size={14} /> Tap any payment to see its receipt.
             </p>
           )}
         </Shell>
       </main>
-    </Frame>
+    </>
   );
 }
