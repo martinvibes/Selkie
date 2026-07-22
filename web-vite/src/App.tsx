@@ -1,5 +1,6 @@
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { AuthProvider } from "./contexts/AuthContext";
+import { ToastProvider } from "./contexts/ToastContext";
 import { Home } from "./pages/Home";
 import { Dashboard } from "./pages/Dashboard";
 import { Account } from "./pages/Account";
@@ -8,7 +9,8 @@ import { TransactionDetail } from "./pages/TransactionDetail";
 export default function App() {
   return (
     <AuthProvider>
-      <BrowserRouter>
+      <ToastProvider>
+        <BrowserRouter>
         <Routes>
           <Route path="/" element={<Home />} />
 
@@ -23,8 +25,9 @@ export default function App() {
           <Route path="/tx/:id" element={<TransactionDetail />} />
 
           <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </BrowserRouter>
+          </Routes>
+        </BrowserRouter>
+      </ToastProvider>
     </AuthProvider>
   );
 }

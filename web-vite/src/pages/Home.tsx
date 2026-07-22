@@ -1,8 +1,9 @@
 import { useRef, useState } from "react";
-import { Navigate, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowRight, AtSign, EyeOff, Lock, Send, Zap } from "lucide-react";
 import { Footer, Header, Shell, Spinner } from "../components/Layout";
 import { XLogo } from "../components/Mark";
+import { Reveal } from "../components/Reveal";
 import { TokenIcon } from "../components/TokenIcon";
 import { useAuth } from "../contexts/useAuth";
 
@@ -45,10 +46,10 @@ const STEPS = [
 ];
 
 const ASSET_TILES = [
-  { asset: "CC", name: "Canton Coin", sym: "CC", note: "The Canton Network's native asset." },
-  { asset: "USDCX", name: "USDCx", sym: "USDCX", note: "A digital dollar on Canton." },
-  { asset: "CBTC", name: "cBTC", sym: "CBTC", note: "Bitcoin, ported to Canton." },
-  { asset: "CETH", name: "cETH", sym: "CETH", note: "Ether, ported to Canton." },
+  { asset: "CC", name: "Canton Coin", note: "The Canton Network's native asset." },
+  { asset: "USDCX", name: "USDCx", note: "A digital dollar on Canton." },
+  { asset: "CBTC", name: "cBTC", note: "Bitcoin, ported to Canton." },
+  { asset: "CETH", name: "cETH", note: "Ether, ported to Canton." },
 ];
 
 /**
@@ -160,9 +161,19 @@ export function Home() {
   const [params] = useSearchParams();
 
   if (loading) return <Spinner />;
-  if (me) return <Navigate to="/dashboard/activity" replace />;
 
   const loginUnavailable = params.get("login") === "unavailable";
+
+  // Signed-in visitors still get the landing; the ask just changes.
+  const cta = me ? (
+    <Link to="/dashboard/activity" className="btn btn-gold">
+      Open your wallet <ArrowRight size={16} />
+    </Link>
+  ) : (
+    <a href="/auth/x/login" className="btn btn-gold">
+      <XLogo size={15} /> Continue with X
+    </a>
+  );
 
   return (
     <>
@@ -191,15 +202,13 @@ export function Home() {
               </p>
 
               <div className="mt-9 flex flex-wrap items-center gap-3.5">
-                <a href="/auth/x/login" className="btn btn-gold">
-                  <XLogo size={15} /> Continue with X
-                </a>
+                {cta}
                 <a href="#how" className="btn btn-dim">
                   How it works
                 </a>
               </div>
 
-              {loginUnavailable && (
+              {loginUnavailable && !me && (
                 <p className="mt-5 max-w-md rounded-xl border border-amber-300/25 bg-amber-300/[0.07] px-4 py-3 text-[13px] leading-relaxed text-amber-100/90">
                   X sign-in is coded and ready but this deployment is missing its X API keys. Set
                   X_CLIENT_ID and X_CLIENT_SECRET on the server to switch it on.
@@ -234,72 +243,71 @@ export function Home() {
         {/* ---- how it works ---- */}
         <Shell wide>
           <section id="how" className="pt-24">
-            <p className="eyebrow">How it works</p>
-            <h2 className="mt-2 font-display text-3xl font-bold tracking-tight sm:text-4xl">
-              Three steps, zero crypto homework.
-            </h2>
+            <Reveal>
+              <p className="eyebrow">How it works</p>
+              <h2 className="mt-2 font-display text-3xl font-bold tracking-tight sm:text-4xl">
+                Three steps, zero crypto homework.
+              </h2>
+            </Reveal>
 
             <div className="mt-10 grid gap-5 md:grid-cols-3">
               {STEPS.map((step, i) => (
-                <div
-                  key={step.n}
-                  className="glass animate-rise overflow-hidden p-7"
-                  style={{ animationDelay: `${i * 90}ms` }}
-                >
-                  <span className="pointer-events-none absolute right-5 top-1 select-none font-display text-[4.5rem] font-bold text-white/[0.045]">
-                    {step.n}
-                  </span>
-                  <span className="grid h-11 w-11 place-items-center rounded-2xl border border-gold/25 bg-gold/[0.12] text-gold-light">
-                    {step.icon}
-                  </span>
-                  <h3 className="mt-5 font-display text-lg font-semibold">{step.title}</h3>
-                  <p className="mt-2 text-sm leading-relaxed text-ivory/55">{step.body}</p>
-                </div>
+                <Reveal key={step.n} delay={i * 130}>
+                  <div className="glass h-full overflow-hidden p-7">
+                    <span className="pointer-events-none absolute right-5 top-1 select-none font-display text-[4.5rem] font-bold text-white/[0.045]">
+                      {step.n}
+                    </span>
+                    <span className="grid h-11 w-11 place-items-center rounded-2xl border border-gold/25 bg-gold/[0.12] text-gold-light">
+                      {step.icon}
+                    </span>
+                    <h3 className="mt-5 font-display text-lg font-semibold">{step.title}</h3>
+                    <p className="mt-2 text-sm leading-relaxed text-ivory/55">{step.body}</p>
+                  </div>
+                </Reveal>
               ))}
             </div>
           </section>
 
           {/* ---- assets ---- */}
           <section className="pt-24">
-            <p className="eyebrow">Assets</p>
-            <h2 className="mt-2 font-display text-3xl font-bold tracking-tight sm:text-4xl">
-              Send what you want.
-            </h2>
-            <p className="mt-3 max-w-lg text-ivory/55">
-              One handle holds them all, and every balance stays between you and whoever you pay.
-            </p>
+            <Reveal>
+              <p className="eyebrow">Assets</p>
+              <h2 className="mt-2 font-display text-3xl font-bold tracking-tight sm:text-4xl">
+                Send what you want.
+              </h2>
+              <p className="mt-3 max-w-lg text-ivory/55">
+                One handle holds them all, and every balance stays between you and whoever you pay.
+              </p>
+            </Reveal>
 
             <div className="mt-10 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              {ASSET_TILES.map((t) => (
-                <div
-                  key={t.asset}
-                  className="glass p-5 transition duration-300 hover:-translate-y-1 hover:border-white/20"
-                >
-                  <TokenIcon asset={t.asset} size={44} />
-                  <p className="mt-4 font-display text-lg font-semibold">{t.name}</p>
-                  <p className="mt-1 text-[13px] leading-relaxed text-ivory/45">{t.note}</p>
-                </div>
+              {ASSET_TILES.map((t, i) => (
+                <Reveal key={t.asset} delay={i * 90}>
+                  <div className="glass h-full p-5 transition duration-300 hover:-translate-y-1 hover:border-white/20">
+                    <TokenIcon asset={t.asset} size={44} />
+                    <p className="mt-4 font-display text-lg font-semibold">{t.name}</p>
+                    <p className="mt-1 text-[13px] leading-relaxed text-ivory/45">{t.note}</p>
+                  </div>
+                </Reveal>
               ))}
             </div>
           </section>
 
           {/* ---- closing CTA ---- */}
           <section className="pt-24">
-            <div className="glass-strong overflow-hidden p-10 text-center sm:p-14">
-              <span className="orb -bottom-56 left-1/2 h-[28rem] w-[28rem] -translate-x-1/2 bg-gold/20" />
-              <h2 className="font-display text-[clamp(1.9rem,4.5vw,2.9rem)] font-bold tracking-tight text-balance">
-                Your handle is already a wallet.
-              </h2>
-              <p className="mx-auto mt-3 max-w-md text-ivory/55">
-                Claim it in one tap, or pay someone who has not claimed theirs yet.
-              </p>
-              <div className="mt-8">
-                <a href="/auth/x/login" className="btn btn-gold">
-                  <XLogo size={15} /> Continue with X
-                </a>
+            <Reveal>
+              <div className="glass-strong overflow-hidden p-10 text-center sm:p-14">
+                <span className="orb -bottom-56 left-1/2 h-[28rem] w-[28rem] -translate-x-1/2 bg-gold/20" />
+                <h2 className="font-display text-[clamp(1.9rem,4.5vw,2.9rem)] font-bold tracking-tight text-balance">
+                  Your handle is already a wallet.
+                </h2>
+                <p className="mx-auto mt-3 max-w-md text-ivory/55">
+                  Claim it in one tap, or pay someone who has not claimed theirs yet.
+                </p>
+                <div className="mt-8 flex justify-center">{cta}</div>
+                <PayAHandle />
               </div>
-              <PayAHandle />
-            </div>
+            </Reveal>
           </section>
         </Shell>
       </main>

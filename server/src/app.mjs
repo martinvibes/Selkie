@@ -58,7 +58,9 @@ export function createApp({ wallet, config, history }) {
     return unseal(cookies[SESSION], config.sessionSecret);
   };
 
-  const login = (res, profile, redirectTo = "/") => {
+  // Landing after login goes straight to the wallet; the landing page itself
+  // stays reachable at "/" for signed-in users.
+  const login = (res, profile, redirectTo = "/dashboard/activity") => {
     const token = seal(
       { handle: normalizeHandle(profile.handle), xid: profile.id, name: profile.name, avatar: profile.avatar },
       config.sessionSecret,

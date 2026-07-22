@@ -1,9 +1,20 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, Navigate, NavLink, useParams, useSearchParams } from "react-router-dom";
-import { ArrowDownLeft, ArrowUpRight, Check, Inbox, Link2, Lock, Sparkles } from "lucide-react";
+import {
+  AlertTriangle,
+  ArrowDownLeft,
+  ArrowUpRight,
+  Check,
+  CheckCircle2,
+  Inbox,
+  Link2,
+  Lock,
+  Sparkles,
+} from "lucide-react";
 import { Avatar, Header, Shell, Spinner } from "../components/Layout";
 import { TokenIcon } from "../components/TokenIcon";
 import { useAuth } from "../contexts/useAuth";
+import { useToast } from "../contexts/ToastContext";
 import { api, type Activity, type CampaignResult, type SendResult } from "../lib/api";
 import { ASSET_LABEL, money, parseHandles, timeAgo } from "../lib/format";
 
@@ -16,14 +27,16 @@ const TABS = [
 /** Copyable pay page link: the shareable half of "your handle is your wallet". */
 function PayLink({ handle }: { handle: string }) {
   const [copied, setCopied] = useState(false);
+  const toast = useToast();
 
   async function copy() {
     try {
       await navigator.clipboard.writeText(`${location.origin}/account/${handle.replace(/^@/, "")}`);
       setCopied(true);
+      toast("success", "Pay link copied. Share it anywhere.");
       setTimeout(() => setCopied(false), 1600);
     } catch {
-      /* clipboard can be unavailable; the button just stays quiet */
+      toast("error", "Couldn't reach the clipboard.");
     }
   }
 
@@ -178,15 +191,21 @@ function ActivityFeed({ entries }: { entries: Activity[] }) {
 
 function ErrorNote({ children }: { children: React.ReactNode }) {
   return (
-    <p className="rounded-xl border border-rose-400/30 bg-rose-400/10 px-4 py-3 text-sm text-rose-200">
-      {children}
+    <p className="shake flex items-start gap-2.5 rounded-xl border border-rose-400/30 bg-rose-400/10 px-4 py-3 text-sm text-rose-200">
+      <AlertTriangle size={15} className="mt-0.5 shrink-0" />
+      <span>{children}</span>
     </p>
   );
 }
 
-function ResultNote({ children }: { children: React.ReactNode }) {
+function ResultNote({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="animate-rise rounded-2xl border border-gold/30 bg-gold/[0.07] p-5">{children}</div>
+    <div className="animate-rise rounded-2xl border border-gold/30 bg-gold/[0.07] p-5">
+      <p className="flex items-center gap-2 font-medium text-gold-light">
+        <CheckCircle2 size={16} /> {title}
+      </p>
+      <div className="mt-2.5">{children}</div>
+    </div>
   );
 }
 
@@ -206,6 +225,7 @@ function SendPanel({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<SendResult | null>(null);
+  const toast = useToast();
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
@@ -218,12 +238,13 @@ function SendPanel({
     try {
       const res = await api.send({ to: to.replace(/^@+/, "").trim(), asset, amount: value, memo });
       setResult(res);
+      toast("success", `Sent ${money(res.amount)} ${ASSET_LABEL[res.asset] ?? res.asset} to ${res.to}`);
       setTo("");
       setAmount("");
       setMemo("");
       onDone();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "That didn't go through.");
+      setError(err instanceof Error ? err.message : "That didn't go through. Nothing was sent.");
     } finally {
       setBusy(false);
     }
@@ -291,21 +312,20 @@ function SendPanel({
         {busy ? "Sending…" : "Send payment"}
       </button>
 
-      {error && <ErrorNote>{error}</ErrorNote>}
+      {error && <ErrorNote key={error}>{error}</ErrorNote>}
 
       {result && (
-        <ResultNote>
+        <ResultNote title="Payment settled on Canton">
           <p>
-            Sent{" "}
             <span className="num font-semibold text-gold-light">
               {money(result.amount)} {ASSET_LABEL[result.asset] ?? result.asset}
             </span>{" "}
-            to <strong>{result.to}</strong>.
+            is now with <strong>{result.to}</strong>.
           </p>
           <p className="mt-2 text-sm text-ivory/55">
             {result.onboarded
               ? `${result.to} had no wallet. Selkie made one, and the money is already theirs.`
-              : "Settled on Canton. The amount stays between you two."}
+              : "The amount stays between you two."}
           </p>
         </ResultNote>
       )}
@@ -321,6 +341,7 @@ function CampaignPanel({ assets, onDone }: { assets: string[]; onDone: () => voi
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<CampaignResult | null>(null);
+  const toast = useToast();
   const winners = parseHandles(raw);
 
   async function submit(event: React.FormEvent) {
@@ -334,12 +355,18 @@ function CampaignPanel({ assets, onDone }: { assets: string[]; onDone: () => voi
     try {
       const res = await api.campaign({ winners, asset, amountEach: value, memo: memo || "reward" });
       setResult(res);
+      toast(
+        res.failed.length ? "error" : "success",
+        res.failed.length
+          ? `Paid ${res.paid} of ${res.paid + res.failed.length} winners`
+          : `Paid all ${res.paid} winners. Nothing left unclaimed.`,
+      );
       setRaw("");
       setAmount("");
       setMemo("");
       onDone();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "That didn't go through.");
+      setError(err instanceof Error ? err.message : "That didn't go through. Nobody was paid.");
     } finally {
       setBusy(false);
     }
@@ -407,10 +434,10 @@ function CampaignPanel({ assets, onDone }: { assets: string[]; onDone: () => voi
             : "Pay everyone"}
       </button>
 
-      {error && <ErrorNote>{error}</ErrorNote>}
+      {error && <ErrorNote key={error}>{error}</ErrorNote>}
 
       {result && (
-        <ResultNote>
+        <ResultNote title="Campaign settled on Canton">
           <div className="flex flex-wrap gap-10">
             {(
               [
@@ -493,7 +520,8 @@ export function Dashboard() {
             ))}
           </nav>
 
-          <div className="mt-5">
+          {/* Keyed by tab so each switch gets the same soft entrance. */}
+          <div className="mt-5 animate-rise" key={tab}>
             {tab === "activity" && <ActivityFeed entries={entries} />}
             {tab === "send" && <SendPanel assets={me.assets} presetTo={presetTo} onDone={refresh} />}
             {tab === "campaign" && <CampaignPanel assets={me.assets} onDone={refresh} />}

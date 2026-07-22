@@ -28,6 +28,37 @@ export function Wordmark({ to = "/" }: { to?: string }) {
   );
 }
 
+/** The mark as a loader: each echo arrow pulses in sequence. */
+export function LoaderMark({ size = 44 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 64 64" aria-hidden="true">
+      <defs>
+        <linearGradient id="loader-mark" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor="#F6DFA4" />
+          <stop offset="1" stopColor="#C9964B" />
+        </linearGradient>
+      </defs>
+      <g strokeLinejoin="round" strokeWidth="7">
+        <path className="la" d="M 9 17 L 9 47 L 35 32 Z" fill="#F2EBDC" stroke="#F2EBDC" />
+        <path
+          className="la"
+          style={{ animationDelay: "160ms" }}
+          d="M 19 17 L 19 47 L 45 32 Z"
+          fill="#F2EBDC"
+          stroke="#F2EBDC"
+        />
+        <path
+          className="la"
+          style={{ animationDelay: "320ms" }}
+          d="M 29 17 L 29 47 L 55 32 Z"
+          fill="url(#loader-mark)"
+          stroke="url(#loader-mark)"
+        />
+      </g>
+    </svg>
+  );
+}
+
 /** The X logo, for "Continue with X". */
 export function XLogo({ size = 15 }: { size?: number }) {
   return (
