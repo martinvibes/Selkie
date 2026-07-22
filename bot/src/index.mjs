@@ -31,9 +31,8 @@ if (!operator) {
     console.error("SELKIE_OPERATOR is required when running against a real validator.");
     process.exit(1);
   }
-  const party = await ledger.allocateParty("selkie-operator");
-  operator = party.identifier;
-  console.log(`Allocated operator party. Reuse it with:\n  export SELKIE_OPERATOR=${operator}\n`);
+  operator = await ledger.ensureOperatorParty();
+  console.log(`Using LocalNet operator party. Pin it with:\n  export SELKIE_OPERATOR=${operator}\n`);
 }
 
 const wallet = new Wallet({ ledger, operator });

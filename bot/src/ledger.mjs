@@ -260,6 +260,28 @@ export class Ledger {
     });
   }
 
+  /**
+   * Find-or-create the operator party on a node we administer (LocalNet).
+   * Restart-safe: a crashed earlier run may have allocated the party without
+   * granting rights, so every path ends by re-asserting the grant.
+   */
+  async ensureOperatorParty(hint = "selkie-operator") {
+    const prefix = `${hint}::`;
+    const granted = (await this.myActAsParties()).find((p) => p.startsWith(prefix));
+    if (granted) return granted;
+
+    let party;
+    try {
+      party = (await this.allocateParty(hint)).identifier;
+    } catch (err) {
+      if (!/already (exists|allocated)/i.test(err.message)) throw err;
+      party = (await this.listParties()).find((p) => p.identifier.startsWith(prefix))?.identifier;
+      if (!party) throw err;
+    }
+    await this.grantActAs(party);
+    return party;
+  }
+
   // --- commands ---------------------------------------------------------
 
   /**

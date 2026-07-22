@@ -103,6 +103,11 @@ export function createApp({ wallet, config, history }) {
       // --- auth: start the X login dance ------------------------------
       if (pathname === "/auth/x/login") {
         if (!config.x.clientId) {
+          // A browser navigation deserves the landing page notice, not raw JSON.
+          if ((req.headers.accept ?? "").includes("text/html")) {
+            res.writeHead(302, { location: "/?login=unavailable" });
+            return res.end();
+          }
           return send(res, 503, { error: "X login is not configured on this deployment" });
         }
         const { verifier, challenge, state } = pkce();
