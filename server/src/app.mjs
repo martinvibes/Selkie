@@ -8,6 +8,7 @@ import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
 import { extname, join, normalize } from "node:path";
 import { normalizeHandle, ASSETS } from "../../bot/src/wallet.mjs";
+import { HANDLE_KEY } from "../../bot/src/cbtc.mjs";
 import { seal, unseal, parseCookies, cookie, clearCookie } from "./session.mjs";
 import { pkce, authorizeUrl, exchangeCode, fetchProfile } from "./xauth.mjs";
 
@@ -29,6 +30,7 @@ export function createApp({ wallet, config, history, cbtc = null }) {
   // One reserve read serves everyone for 30s: the endpoint is public, and the
   // ledger should not be re-queried per pageview.
   let reserveCache = null;
+  const operatorHandle = config.operatorHandle ? normalizeHandle(config.operatorHandle) : null;
   const send = (res, status, body, headers = {}) => {
     const payload = JSON.stringify(body);
     res.writeHead(status, {
@@ -282,6 +284,70 @@ export function createApp({ wallet, config, history, cbtc = null }) {
           } catch (err) {
             const status = err.code === "INSUFFICIENT_FUNDS" ? 400 : 500;
             return send(res, status, { error: err.message, code: err.code ?? null });
+          }
+        }
+
+        // Where money gets into Selkie from the outside world.
+        //
+        // Selkie receives at ONE Canton party and keeps per-handle ownership in
+        // its own contracts, so the address below is the same for everybody and
+        // the handle tag is what makes a deposit yours. We say so plainly here
+        // rather than dressing a shared address up as a personal one.
+        if (pathname === "/api/deposit" && req.method === "GET") {
+          if (!cbtc) return send(res, 200, { active: false });
+          return send(res, 200, {
+            active: true,
+            address: cbtc.party,
+            network: "Canton devnet",
+            instrument: cbtc.instrument,
+            tagKey: HANDLE_KEY,
+            tag: session.handle,
+            isOperator: operatorHandle === session.handle,
+          });
+        }
+
+        // Claiming is receiver-side by design: on the token standard an
+        // incoming transfer waits as an instruction until we accept it, so
+        // nothing lands in a wallet without Selkie exercising a choice.
+        if (pathname === "/api/deposit/claim" && req.method === "POST") {
+          if (!cbtc) return send(res, 400, { error: "deposits are not configured" });
+          try {
+            const body = await readBody(req);
+            // Untagged transfers, e.g. straight from the cBTC faucet, name
+            // nobody. Only the handle that runs the deposit party may take
+            // them, and only by asking for them explicitly.
+            const sweeping =
+              Boolean(body.includeUntagged) && operatorHandle === session.handle;
+            const waiting = await cbtc.pending();
+            const mine = waiting.filter((t) =>
+              t.handle ? normalizeHandle(t.handle) === session.handle : sweeping,
+            );
+            const unattributed = sweeping ? 0 : waiting.filter((t) => !t.handle).length;
+
+            const claimed = [];
+            for (const t of mine) {
+              const { updateId } = await cbtc.accept(t.cid);
+              await wallet.deposit(session.handle, cbtc.instrument, t.amount);
+              const logged = await history.append({
+                type: "deposit",
+                from: t.sender,
+                to: session.handle,
+                asset: cbtc.instrument,
+                amount: t.amount,
+                memo: "deposit from Canton",
+                onboarded: false,
+              });
+              claimed.push({ amount: t.amount, sender: t.sender, updateId, id: logged.id });
+            }
+            // The reserve moved, so the cached copy is now a lie.
+            if (claimed.length) reserveCache = null;
+            return send(res, 200, {
+              claimed,
+              total: claimed.reduce((n, c) => n + c.amount, 0),
+              unattributed,
+            });
+          } catch (err) {
+            return send(res, 502, { error: `deposit check failed: ${err.message}` });
           }
         }
 

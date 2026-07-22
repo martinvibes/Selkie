@@ -14,7 +14,7 @@ export type Balances = { handle: string; balances: Record<string, number> };
 export type Activity = {
   id?: string;
   ts: string;
-  type: "send" | "reward";
+  type: "send" | "reward" | "deposit";
   from: string;
   to: string;
   asset: string;
@@ -57,6 +57,30 @@ export type PublicAccount = {
   handle: string;
   exists: boolean;
   canReceive: true;
+};
+
+/**
+ * Where outside money comes in. One shared Canton party receives for every
+ * handle, so `tag` is what makes a transfer yours: senders put it in the
+ * transfer's metadata under `tagKey`.
+ */
+export type Deposit =
+  | { active: false }
+  | {
+      active: true;
+      address: string;
+      network: string;
+      instrument: string;
+      tagKey: string;
+      tag: string;
+      /** Runs the deposit party, so may claim transfers that named no handle. */
+      isOperator: boolean;
+    };
+
+export type DepositClaim = {
+  claimed: { amount: number; sender: string; updateId: string; id: string }[];
+  total: number;
+  unattributed: number;
 };
 
 export type Reserve =
@@ -102,6 +126,14 @@ export const api = {
 
   campaign: (payload: { winners: string[]; asset: string; amountEach: number; memo?: string }) =>
     request<CampaignResult>("/api/campaign", { method: "POST", body: JSON.stringify(payload) }),
+
+  deposit: () => request<Deposit>("/api/deposit"),
+
+  claimDeposits: (includeUntagged = false) =>
+    request<DepositClaim>("/api/deposit/claim", {
+      method: "POST",
+      body: JSON.stringify({ includeUntagged }),
+    }),
 
   requests: () => request<Requests>("/api/requests"),
 

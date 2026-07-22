@@ -4,9 +4,11 @@ import {
   Activity as ActivityIcon,
   AlertTriangle,
   ArrowDownLeft,
+  ArrowDownToLine,
   ArrowUpRight,
   Check,
   CheckCircle2,
+  Copy,
   HandCoins,
   Inbox,
   Link2,
@@ -22,17 +24,20 @@ import {
   api,
   type Activity,
   type CampaignResult,
+  type Deposit,
+  type DepositClaim,
   type Me,
   type PaymentRequest,
   type Requests,
   type Reserve,
   type SendResult,
 } from "../lib/api";
-import { ASSET_LABEL, money, parseHandles, timeAgo } from "../lib/format";
+import { ASSET_LABEL, counterparty, money, parseHandles, timeAgo } from "../lib/format";
 
 const TABS = [
   { id: "activity", label: "Activity", icon: <ActivityIcon size={19} /> },
   { id: "send", label: "Send", icon: <Send size={18} /> },
+  { id: "deposit", label: "Deposit", icon: <ArrowDownToLine size={19} /> },
   { id: "requests", label: "Requests", icon: <HandCoins size={19} /> },
   { id: "campaign", label: "Pay many", icon: <Sparkles size={18} /> },
 ] as const;
@@ -234,7 +239,7 @@ function ActivityFeed({ entries }: { entries: Activity[] }) {
                 )}
               </p>
               <p className="truncate text-[13px] font-medium text-pen/50">
-                {inbound ? `from ${e.from}` : `to ${e.to}`}
+                {inbound ? `from ${counterparty(e.from)}` : `to ${counterparty(e.to)}`}
                 {e.memo ? ` · ${e.memo}` : ""}
               </p>
             </div>
@@ -404,6 +409,164 @@ function SendPanel({
         </ResultNote>
       )}
     </form>
+  );
+}
+
+/** A long ledger string you are meant to copy, never to retype. */
+function CopyField({ label, value }: { label: string; value: string }) {
+  const [copied, setCopied] = useState(false);
+  const toast = useToast();
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopied(true);
+      toast("success", `${label} copied.`);
+      setTimeout(() => setCopied(false), 1600);
+    } catch {
+      toast("error", "Couldn't reach the clipboard.");
+    }
+  }
+
+  return (
+    <div className="grid gap-2">
+      <span className="label">{label}</span>
+      {/* A party id is 70 characters. It wraps rather than truncates: a
+          half-shown address is worse than a two-line one, and letting it
+          break keeps it from widening the whole column. */}
+      <div className="flex items-start gap-2.5">
+        <code className="num min-w-0 flex-1 break-all rounded-xl border-2 border-pen bg-card-bright px-4 py-3 text-[13px] font-semibold leading-relaxed">
+          {value}
+        </code>
+        <button type="button" onClick={copy} className="btn btn-dim btn-sm shrink-0">
+          {copied ? <Check size={14} /> : <Copy size={14} />}
+          {copied ? "Copied" : "Copy"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function DepositPanel({ onDone }: { onDone: () => void }) {
+  const [info, setInfo] = useState<Deposit | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<DepositClaim | null>(null);
+  const toast = useToast();
+
+  useEffect(() => {
+    void api
+      .deposit()
+      .then(setInfo)
+      .catch(() => setInfo({ active: false }));
+  }, []);
+
+  async function check(includeUntagged = false) {
+    setBusy(true);
+    try {
+      const res = await api.claimDeposits(includeUntagged);
+      setResult(res);
+      toast(
+        res.claimed.length ? "success" : "error",
+        res.claimed.length
+          ? `${money(res.total)} cBTC landed in your wallet.`
+          : "Nothing waiting for your handle yet.",
+      );
+      onDone();
+    } catch (err) {
+      toast("error", err instanceof Error ? err.message : "Couldn't reach the ledger.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (!info) return <div className="chunk p-10 text-center font-bold text-pen/50">Loading…</div>;
+
+  if (!info.active) {
+    return (
+      <section className="chunk p-6 sm:p-7">
+        <p className="font-display text-lg font-bold">Deposits are off on this build</p>
+        <p className="mt-2 text-sm font-medium text-pen/60">
+          Selkie takes deposits in cBTC on Canton devnet. This instance is running without a devnet
+          connection, so there is nowhere to receive.
+        </p>
+      </section>
+    );
+  }
+
+  return (
+    <div className="grid gap-6">
+      <section className="chunk p-6 sm:p-7">
+        <p className="font-display text-lg font-bold">Fund your wallet</p>
+        <p className="mt-2 text-sm font-medium text-pen/60">
+          Send {info.instrument} from any Canton wallet to the address below. Selkie receives for
+          every handle at this one address, so the tag is what tells it the money is yours. Put it
+          in the transfer's metadata under{" "}
+          <code className="num font-bold text-pen/80">{info.tagKey}</code>.
+        </p>
+
+        <div className="mt-5 grid gap-4">
+          <CopyField label={`Address on ${info.network}`} value={info.address} />
+          <CopyField label="Your tag" value={info.tag} />
+        </div>
+
+        <p className="mt-5 flex items-start gap-2.5 border-t-2 border-pen/10 pt-4 text-[13px] font-medium text-pen/55">
+          <Lock size={13} className="mt-0.5 shrink-0" />
+          <span>
+            A transfer waits on the ledger until it is accepted, so nothing lands until you tap
+            below. An untagged transfer is left alone rather than handed to whoever asks next.
+          </span>
+        </p>
+      </section>
+
+      <section className="chunk p-6 sm:p-7">
+        <p className="font-display text-lg font-bold">Already sent something?</p>
+        <p className="mt-1 text-[13px] font-medium text-pen/55">
+          This reads the ledger for transfers tagged with your handle and accepts them.
+        </p>
+        <button onClick={() => check()} disabled={busy} className="btn btn-gold mt-4 w-full">
+          {busy ? "Checking the ledger…" : "Check for deposits"}
+        </button>
+
+        {/* Faucet transfers name nobody. Only the handle running the deposit
+            party can take those, and only by saying so. */}
+        {info.isOperator && (
+          <button
+            onClick={() => check(true)}
+            disabled={busy}
+            className="btn btn-dim btn-sm mt-3 w-full"
+          >
+            Also take untagged transfers (operator)
+          </button>
+        )}
+
+        {result && (
+          <div className="mt-5">
+            {result.claimed.length ? (
+              <ResultNote title="Deposit settled on Canton">
+                <p className="font-medium">
+                  <span className="num font-bold text-gold-ink">
+                    {money(result.total)} {info.instrument}
+                  </span>{" "}
+                  is now in your wallet, and in Selkie's on-ledger reserve.
+                </p>
+              </ResultNote>
+            ) : (
+              <p className="text-sm font-medium text-pen/55">
+                Nothing tagged for {info.tag} is waiting. A transfer can take a moment to reach the
+                participant.
+              </p>
+            )}
+            {result.unattributed > 0 && (
+              <p className="mt-3 text-[13px] font-medium text-pen/55">
+                {result.unattributed} untagged{" "}
+                {result.unattributed === 1 ? "transfer is" : "transfers are"} also waiting. Those
+                name no handle, so Selkie will not assign them automatically.
+              </p>
+            )}
+          </div>
+        )}
+      </section>
+    </div>
   );
 }
 
@@ -847,6 +1010,7 @@ export function Dashboard() {
                   {tab === "send" && (
                     <SendPanel assets={me.assets} presetTo={presetTo} onDone={refresh} />
                   )}
+                  {tab === "deposit" && <DepositPanel onDone={refresh} />}
                   {tab === "requests" && (
                     <RequestsPanel assets={me.assets} requests={requests} onDone={refresh} />
                   )}

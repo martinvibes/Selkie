@@ -18,6 +18,9 @@ const config = {
   sessionSecret: process.env.SELKIE_SESSION_SECRET ?? randomBytes(32).toString("hex"),
   secureCookies: process.env.SELKIE_SECURE_COOKIES === "1",
   devLogin: process.env.SELKIE_DEV_LOGIN === "1",
+  // Whoever runs the deposit party. Only this handle may claim a transfer
+  // that named no handle, because only they can know who it was meant for.
+  operatorHandle: process.env.SELKIE_OPERATOR_HANDLE ?? "",
   webRoot: resolve(process.env.SELKIE_WEB_ROOT ?? join(here, "../../web")),
   x: {
     clientId: process.env.X_CLIENT_ID ?? "",

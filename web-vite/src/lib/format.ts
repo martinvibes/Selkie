@@ -27,6 +27,17 @@ export function money(value: number | string): string {
 export const normalizeHandle = (handle: string): string =>
   `@${handle.trim().replace(/^@+/, "").toLowerCase()}`;
 
+/**
+ * Handles print as they are; a raw Canton party (hint::1220<64 hex>) prints as
+ * its hint plus a short fingerprint, because the full string is 70 characters
+ * of noise in a feed row.
+ */
+export function counterparty(value: string): string {
+  if (!value.includes("::")) return value;
+  const [hint, fingerprint] = value.split("::");
+  return `${hint}::${fingerprint.slice(0, 8)}…`;
+}
+
 export function parseHandles(text: string): string[] {
   return [
     ...new Set(

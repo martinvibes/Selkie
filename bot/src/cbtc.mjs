@@ -17,6 +17,16 @@
 
 import { randomUUID } from "node:crypto";
 import { cacheWindowSeconds } from "./ledger.mjs";
+import { normalizeHandle } from "./wallet.mjs";
+
+/**
+ * Metadata key naming the Selkie handle a transfer is for.
+ *
+ * The token standard carries an open string map on every transfer, and this is
+ * the one entry we care about. Selkie receives every deposit at a single
+ * party, so without this tag an incoming transfer is money with no owner.
+ */
+export const HANDLE_KEY = "selkie.handle";
 
 const HOLDING_VIEW =
   "#splice-api-token-holding-v1:Splice.Api.Token.HoldingV1:Holding";
@@ -163,7 +173,15 @@ export class Cbtc {
     };
   }
 
-  /** Transfers other parties started toward us and nobody accepted yet. */
+  /**
+   * Transfers other parties started toward us and nobody accepted yet.
+   *
+   * `handle` is whatever the sender wrote into the transfer's metadata under
+   * HANDLE_KEY. Selkie receives at one party, so that tag is the only thing
+   * that says which handle a deposit belongs to: an untagged transfer is real
+   * money with no owner, and the caller has to deal with that rather than
+   * guess.
+   */
   async pending() {
     return (await this.#activeByInterface(TRANSFER_INSTRUCTION))
       .filter(
@@ -175,6 +193,7 @@ export class Cbtc {
         cid: t.cid,
         sender: t.view.transfer.sender,
         amount: Number(t.view.transfer.amount),
+        handle: t.view.transfer.meta?.values?.[HANDLE_KEY] ?? null,
       }));
   }
 
@@ -228,7 +247,7 @@ export class Cbtc {
    * our unlocked holdings atomically, which is why we pass every unlocked
    * contract as input and let the standard make change.
    */
-  async send({ receiver, amount }) {
+  async send({ receiver, amount, handle = null }) {
     const { unlocked, contracts } = await this.holdings();
     if (!(amount > 0)) throw new Error("amount must be positive");
     if (amount > unlocked) {
@@ -244,7 +263,9 @@ export class Cbtc {
       requestedAt: new Date(now).toISOString(),
       executeBefore: new Date(now + 24 * 3600 * 1000).toISOString(),
       inputHoldingCids: inputs,
-      meta: { values: {} },
+      // Tagging the receiving handle here is what makes a deposit
+      // attributable when the receiver is a shared party like Selkie's.
+      meta: { values: handle ? { [HANDLE_KEY]: normalizeHandle(handle) } : {} },
     };
     const factory = await this.registry("/registry/transfer-instruction/v1/transfer-factory", {
       choiceArguments: {
