@@ -29,7 +29,11 @@ Plus a web dashboard (log in with X): balances, history, deposit/withdraw to any
 
 ## How cBTC & cETH are integrated
 
-cBTC and cETH are **first-class settlement assets** in Selkie: every send, escrow, split, reward payout and market settlement is a state change on the asset — debit + credit composed atomically in a single Canton transaction. The MVP models holdings internally (`daml/daml/Selkie/Holding.daml`); the mainnet step swaps these for the CIP-56 token interfaces (same shape: amount + owner + atomic transfer), which is what makes cBTC, cETH and USDCx interchangeable inside one command grammar.
+Two layers, both real:
+
+**Real cBTC on Canton DevNet.** Selkie holds a live cBTC reserve on the shared HackCanton participant (`hackcanton-01`) and moves it through the CIP-56 token standard: choice contexts come from the DA Utility registry, transfers execute as `TransferFactory_Transfer` / `TransferInstruction_Accept` on the JSON Ledger API v2, and every settlement prints its on-ledger `updateId`. `bot/src/cbtc.mjs` is the whole client, dependency-free; `GET /api/reserve` proves the holdings to anyone, no login required. Details: [docs/devnet.md](docs/devnet.md).
+
+**Instant handle-to-handle payments.** Inside the wallet, every send, split and reward payout is a debit + credit composed atomically in a single Canton transaction (`daml/daml/Selkie/Holding.daml`), the same shape as the token standard (amount + owner + atomic transfer), which is what lets cBTC, cETH and USDCx share one command grammar.
 
 ## Architecture
 
@@ -47,21 +51,20 @@ Telegram  ──┘   (shared grammar)     │     Escrow · Request · Rewards
 ## Run it
 
 ```bash
-# 1. ledger
+# 1. ledger: Canton 3 LocalNet (the Splice docker compose stack), then upload
+#    the DAR and pin its package id
 cd daml && daml build
-daml sandbox --dar .daml/dist/selkie-0.1.0.dar
-daml json-api --ledger-host localhost --ledger-port 6865 \
-  --http-port 7575 --allow-insecure-tokens
+export SELKIE_PKG_ID=$(daml damlc inspect-dar --json .daml/dist/selkie-0.1.0.dar | jq -r .main_package_id)
 
-# 2. tests (unit + live-ledger integration)
+# 2. tests (unit + live-ledger integration against LocalNet on :3975)
 cd bot && npm test
+cd ../server && npm test
 
-# 3. see a payout happen
-export SELKIE_PKG_ID=$(daml damlc inspect-dar --json ../daml/.daml/dist/selkie-0.1.0.dar | jq -r .main_package_id)
-node scripts/demo-chat.mjs
+# 3. web wallet + API (X login, dashboard, /api/reserve)
+cd server && source .env && node src/index.mjs    # http://localhost:4000
 
-# 4. the bot itself
-SELKIE_TELEGRAM_TOKEN=... node src/index.mjs
+# 4. the Telegram bot (t.me/selkiepay_bot)
+cd bot && source .env && node src/index.mjs
 ```
 
 `demo-chat.mjs` replays a real community payout end to end. Latest local run: **20 winners paid in 9.2s, 20 of 20 onboarded mid-payment, 0 unclaimed.**

@@ -1,65 +1,87 @@
-# Running Selkie on Canton DevNet
+# Selkie on Canton DevNet: the real cBTC reserve
 
-Everything in Selkie runs against a local DAML sandbox today. The code is not
-sandbox-specific: `ledgerFromEnv()` picks its auth mode from the environment, so
-moving to a real validator is configuration, not a rewrite.
+Selkie's wallet ledger (accounts, balances, payments between handles) runs on
+a Canton 3 LocalNet participant. On top of that, Selkie holds a **real cBTC
+position on Canton DevNet**, on the shared HackCanton participant
+(`hackcanton-01`), and proves it over HTTP.
 
-## What changes
-
-| | Sandbox | DevNet validator |
-|---|---|---|
-| Token | we sign it ourselves (HS256, shared secret) | fetched from the operator's OIDC provider |
-| Rights | claimed in the token we minted | granted to the app user on the participant |
-| Operator party | allocated on boot if missing | created once at onboarding, never re-allocated |
-| Ledger reachable at | `localhost:7575` | the validator's JSON API |
-
-Set these and the live path turns on. Nothing else changes:
-
-```sh
-export SELKIE_JSON_API=https://<validator>/v1
-export SELKIE_LEDGER_ID=<ledger id>
-export SELKIE_OPERATOR='selkie-operator::1220<64 hex>'
-export SELKIE_AUTH_TOKEN_URL=https://<idp>/oauth/token
-export SELKIE_AUTH_CLIENT_ID=...
-export SELKIE_AUTH_CLIENT_SECRET=...
-export SELKIE_AUTH_AUDIENCE=https://canton.network.global   # if the IdP wants one
+```
+GET /api/reserve
 ```
 
-Leaving `SELKIE_AUTH_TOKEN_URL` unset keeps local development exactly as it is.
-A half-configured live setup fails at boot rather than at the first payment.
+returns the live holdings, read from the DevNet participant's ledger at most
+30 seconds ago. No login required: the point of a reserve is that anyone can
+check it.
 
-## Getting the address the token forms ask for
+## How cBTC actually moves
+
+cBTC (BitSafe) has no API of its own. Holdings are CIP-56 token-standard
+contracts, and they move through two interfaces on the ordinary JSON Ledger
+API v2:
+
+- `TransferFactory_Transfer` starts a transfer
+- `TransferInstruction_Accept` accepts an incoming one
+
+Both choices need context the issuer computes off-ledger (the applicable
+transfer rule, the instrument configuration, and disclosed contracts our
+participant does not host). The issuer serves that context from the DA
+Utility registry:
+
+```
+https://api.utilities.digitalasset-dev.com
+  /api/token-standard/v0/registrars/<cbtc admin party>
+  /registry/transfer-instruction/v1/...
+```
+
+So every transfer is two calls: fetch the choice context from the registry,
+then exercise the choice on the ledger with that context attached verbatim.
+`bot/src/cbtc.mjs` is the whole client, dependency-free.
+
+## Operating the reserve
+
+```sh
+cd bot && source .env
+node scripts/cbtc.mjs status            # holdings + pending transfers
+node scripts/cbtc.mjs accept            # claim faucet transfers
+node scripts/cbtc.mjs send <party> <n>  # real settlement to any DevNet party
+```
+
+Every accept and send prints the on-ledger `updateId`, which is the receipt:
+the state change is visible in the party's ACS immediately after.
+
+## Configuration
+
+All-or-nothing by design; a half-configured reserve fails at boot instead of
+quietly showing zero. Secrets live in the gitignored `.env` files only.
+
+```sh
+export SELKIE_CBTC_LEDGER=...     # participant JSON Ledger API v2 base URL
+export SELKIE_CBTC_REGISTRY=...   # issuer registry base (DA Utility)
+export SELKIE_CBTC_ADMIN=...      # instrument admin party (cbtc-network::...)
+export SELKIE_CBTC_PARTY=...      # our party on the participant
+export SELKIE_CBTC_TOKEN_URL=...  # Keycloak token endpoint
+export SELKIE_CBTC_CLIENT_ID=...  # OIDC client (password grant)
+export SELKIE_CBTC_USERNAME=...
+export SELKIE_CBTC_PASSWORD=...
+```
+
+Auth is a resource-owner-password grant against the validator's Keycloak;
+the participant derives ledger rights from the token's `sub`, so the token
+carries no claims worth forging.
+
+## Getting the party id for token forms
 
 ```sh
 node bot/scripts/address.mjs
 ```
 
-It prints the party id and nothing else, so it can be piped or pasted straight
-into the cBTC faucet ("Recipient Party Address") or the cETH request form
-("Canton address").
+Prints the party id and nothing else. It refuses to print a sandbox party:
+a local party id looks identical to a real one, and tokens sent to a local
+party are unrecoverable.
 
-It **refuses** to print a sandbox party. A local party id has the same shape as
-a real one, `party-hint::1220<64 hex>`, so there is nothing to eyeball. Tokens
-sent to a local party are unrecoverable, and the cETH request is reviewed by a
-human once. Do not fill either form until this command exits 0.
+## What is still gated
 
-## Current blocker
-
-Self-service validator onboarding is not reachable from our network:
-
-```
-POST https://sv.sv-1.dev.global.canton.network.sync.global/api/sv/v0/devnet/onboard/validator/prepare
-  -> 403
-
-GET  https://scan.sv-1.dev.global.canton.network.sync.global/api/scan/v0/dso
-  -> 403
-```
-
-The public scan endpoint returning 403 as well means this is an egress IP
-allowlist covering the DevNet global domain, not a permissions problem on the
-onboarding route. It cannot be worked around from our side, and there is no
-point retrying it. An SV operator has to either allowlist our egress IP or issue
-an onboarding secret.
-
-Until then Selkie runs end to end on the sandbox, which is what the tests and
-the demo exercise.
+Our user on the shared participant can act only as its own party. Uploading
+the Selkie DAR to DevNet and allocating per-handle parties there needs the
+node operator (participant admin rights). Until then, handle-to-handle
+payments settle on LocalNet while the cBTC reserve is real on DevNet.

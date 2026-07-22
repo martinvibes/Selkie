@@ -47,6 +47,19 @@ export type PublicAccount = {
   canReceive: true;
 };
 
+export type Reserve =
+  | { active: false }
+  | {
+      active: true;
+      instrument: string;
+      network: string;
+      party: string;
+      total: number;
+      unlocked: number;
+      contracts: { cid: string; amount: number; locked: boolean }[];
+      asOf: string;
+    };
+
 export class ApiError extends Error {
   status: number;
   constructor(message: string, status: number) {
@@ -82,4 +95,6 @@ export const api = {
     request<PublicAccount>(`/api/account/${encodeURIComponent(handle.replace(/^@/, ""))}`),
 
   transaction: (id: string) => request<Activity>(`/api/tx/${encodeURIComponent(id)}`),
+
+  reserve: () => request<Reserve>("/api/reserve"),
 };

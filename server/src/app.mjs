@@ -25,7 +25,10 @@ const MIME = {
 const SESSION = "selkie_session";
 const OAUTH = "selkie_oauth";
 
-export function createApp({ wallet, config, history }) {
+export function createApp({ wallet, config, history, cbtc = null }) {
+  // One reserve read serves everyone for 30s: the endpoint is public, and the
+  // ledger should not be re-queried per pageview.
+  let reserveCache = null;
   const send = (res, status, body, headers = {}) => {
     const payload = JSON.stringify(body);
     res.writeHead(status, {
@@ -178,6 +181,31 @@ export function createApp({ wallet, config, history }) {
           exists: Boolean(account),
           canReceive: true,
         });
+      }
+
+      // Deliberately public, like the account pages: anyone can verify that
+      // Selkie's cBTC is matched by real holdings on Canton devnet without
+      // signing in. It reveals the operator's reserve and nothing about users.
+      if (pathname === "/api/reserve" && req.method === "GET") {
+        if (!cbtc) return send(res, 200, { active: false });
+        try {
+          if (!reserveCache || Date.now() - reserveCache.at > 30_000) {
+            reserveCache = { at: Date.now(), holdings: await cbtc.holdings() };
+          }
+          const { at, holdings } = reserveCache;
+          return send(res, 200, {
+            active: true,
+            instrument: cbtc.instrument,
+            network: "Canton devnet",
+            party: cbtc.party,
+            total: holdings.total,
+            unlocked: holdings.unlocked,
+            contracts: holdings.contracts,
+            asOf: new Date(at).toISOString(),
+          });
+        } catch (err) {
+          return send(res, 503, { error: `reserve unavailable: ${err.message}` });
+        }
       }
 
       // --- API --------------------------------------------------------

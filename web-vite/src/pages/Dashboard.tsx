@@ -15,7 +15,7 @@ import { Avatar, Header, Shell, Spinner } from "../components/Layout";
 import { TokenIcon } from "../components/TokenIcon";
 import { useAuth } from "../contexts/useAuth";
 import { useToast } from "../contexts/ToastContext";
-import { api, type Activity, type CampaignResult, type SendResult } from "../lib/api";
+import { api, type Activity, type CampaignResult, type Reserve, type SendResult } from "../lib/api";
 import { ASSET_LABEL, money, parseHandles, timeAgo } from "../lib/format";
 
 const TABS = [
@@ -75,7 +75,15 @@ function AssetPicker({
   );
 }
 
-function Balances({ assets, balances }: { assets: string[]; balances: Record<string, number> }) {
+function Balances({
+  assets,
+  balances,
+  reserve,
+}: {
+  assets: string[];
+  balances: Record<string, number>;
+  reserve: Reserve | null;
+}) {
   const empty = assets.every((a) => !balances[a]);
   return (
     <section className="glass-strong mt-8 p-6 sm:p-7">
@@ -112,6 +120,19 @@ function Balances({ assets, balances }: { assets: string[]; balances: Record<str
       {empty && (
         <p className="mt-4 text-[13px] text-ivory/40">
           Your wallet fills the moment someone sends you something.
+        </p>
+      )}
+
+      {reserve?.active && (
+        <p className="mt-4 flex items-center gap-2.5 border-t border-white/[0.05] pt-4 text-[13px] text-ivory/45">
+          <span className="pulse-dot h-1.5 w-1.5 shrink-0 rounded-full bg-gold-light" />
+          <span>
+            cBTC backed by a live reserve on {reserve.network}:{" "}
+            <span className="num font-medium text-ivory/75">
+              {money(reserve.total)} {reserve.instrument}
+            </span>{" "}
+            on ledger · verified {timeAgo(reserve.asOf)}
+          </span>
         </p>
       )}
     </section>
@@ -471,12 +492,20 @@ export function Dashboard() {
   const [search] = useSearchParams();
   const [balances, setBalances] = useState<Record<string, number>>({});
   const [entries, setEntries] = useState<Activity[]>([]);
+  const [reserve, setReserve] = useState<Reserve | null>(null);
 
   const refresh = useCallback(async () => {
     if (!me) return;
-    const [b, h] = await Promise.all([api.balance(), api.history()]);
+    // The reserve is nice-to-have context; a hiccup there must not take the
+    // wallet down with it.
+    const [b, h, r] = await Promise.all([
+      api.balance(),
+      api.history(),
+      api.reserve().catch(() => null),
+    ]);
     setBalances(b.balances);
     setEntries(h.entries);
+    setReserve(r);
   }, [me]);
 
   useEffect(() => {
@@ -505,7 +534,7 @@ export function Dashboard() {
             <PayLink handle={me.handle} />
           </div>
 
-          <Balances assets={me.assets} balances={balances} />
+          <Balances assets={me.assets} balances={balances} reserve={reserve} />
 
           <nav className="seg mt-9" role="tablist">
             {TABS.map((t) => (

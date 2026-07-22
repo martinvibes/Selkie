@@ -6,6 +6,7 @@ import { randomBytes } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { dirname, join, resolve } from "node:path";
 import { ledgerFromEnv } from "../../bot/src/ledger.mjs";
+import { cbtcFromEnv } from "../../bot/src/cbtc.mjs";
 import { Wallet } from "../../bot/src/wallet.mjs";
 import { History } from "./history.mjs";
 import { createApp } from "./app.mjs";
@@ -51,9 +52,13 @@ if (!operator) {
 const wallet = new Wallet({ ledger, operator });
 const history = new History(process.env.SELKIE_HISTORY ?? join(here, "../../.data/history.jsonl"));
 
-createApp({ wallet, config, history }).listen(config.port, () => {
+// Throws on a half-configured setup: better no reserve than a wrong one.
+const cbtc = cbtcFromEnv();
+
+createApp({ wallet, config, history, cbtc }).listen(config.port, () => {
   console.log(`Selkie on http://localhost:${config.port}`);
   console.log(`  operator: ${operator}`);
   console.log(`  X login:  ${config.x.clientId ? "configured" : "not configured (set X_CLIENT_ID)"}`);
+  console.log(`  cBTC:     ${cbtc ? `live reserve on Canton devnet (${cbtc.party.slice(0, 24)}...)` : "local asset only"}`);
   if (config.devLogin) console.log("  dev login: ENABLED at /auth/dev?handle=name");
 });
