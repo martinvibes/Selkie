@@ -2,96 +2,454 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Selkie — dark neo-brutalism.
+   Thick ivory borders, hard BLACK offset shadows. The shadows read because no
+   surface is pure black: page and panels sit above #000, so a #000 offset lands
+   as real depth. Gold is the one accent that carries the brand; each token gets
+   its own bright colour. */
+
 @layer base {
   :root {
     color-scheme: dark;
+    --ink: #0b0912;
+    --night: #14101e;
+    --panel: #1c1730;
+    --raised: #241d3a;
+    --line: #f2ebdc;
+    --ivory: #f2ebdc;
+    --muted: #b6adc4;
+    --gold-light: #f6dfa4;
+    --gold: #d9a85c;
+    --gold-deep: #c9964b;
+    --offset: #000000;
+  }
+
+  * {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  *::-webkit-scrollbar {
+    display: none;
+  }
+
+  html,
+  body,
+  #root {
+    min-height: 100%;
   }
 
   body {
-    @apply bg-ink font-ui text-ivory antialiased;
-    /* Depth: the page darkens as it descends, like water. */
-    background-image:
-      radial-gradient(120% 60% at 50% -10%, rgb(246 223 164 / 0.07), transparent 60%),
-      linear-gradient(180deg, #0b0912 0%, #060a12 55%, #04070d 100%);
-    background-attachment: fixed;
-    min-height: 100vh;
+    margin: 0;
+    font-family: "Unbounded", ui-sans-serif, system-ui, sans-serif;
+    color: var(--ivory);
+    background: var(--ink);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
   }
 
-  :focus-visible {
-    @apply outline-none ring-2 ring-gold ring-offset-2 ring-offset-ink;
+  h1,
+  h2,
+  h3,
+  .display {
+    font-family: "Big Shoulders Display", "Unbounded", ui-sans-serif, sans-serif;
+    letter-spacing: 0.01em;
+    line-height: 0.92;
+  }
+
+  ::selection {
+    color: var(--ink);
+    background: var(--gold-light);
   }
 }
 
 @layer components {
-  /* The signature: a horizon between public identity and private value. */
+  /* --- the framed page: a rounded window onto a gold-lit deep --- */
+  .frame {
+    position: relative;
+    min-height: 100vh;
+    padding: 0.5rem;
+    isolation: isolate;
+  }
+  .frame::before {
+    content: "";
+    position: fixed;
+    inset: 0.5rem;
+    z-index: -1;
+    border-radius: 1.75rem;
+    border: 2px solid rgba(242, 235, 220, 0.14);
+    background-color: var(--night);
+    background-image:
+      radial-gradient(120% 80% at 50% 118%, rgba(217, 168, 92, 0.42) 0%, rgba(217, 168, 92, 0.08) 34%, transparent 60%),
+      radial-gradient(90% 60% at 50% -10%, rgba(166, 180, 255, 0.12) 0%, transparent 55%),
+      linear-gradient(0deg, rgba(4, 3, 8, 0.6), rgba(4, 3, 8, 0.6)),
+      repeating-linear-gradient(0deg, rgba(242, 235, 220, 0.035) 0 1px, transparent 1px 34px),
+      repeating-linear-gradient(90deg, rgba(242, 235, 220, 0.035) 0 1px, transparent 1px 34px);
+  }
+  @media (min-width: 640px) {
+    .frame {
+      padding: 1rem;
+    }
+    .frame::before {
+      inset: 1rem;
+      border-radius: 2.25rem;
+    }
+  }
+
+  .shell {
+    width: 100%;
+    max-width: 60rem;
+    margin-inline: auto;
+    padding-inline: 1.25rem;
+  }
+  @media (min-width: 640px) {
+    .shell {
+      padding-inline: 2rem;
+    }
+  }
+
+  /* --- cards --- */
+  .card {
+    background: var(--panel);
+    border: 2px solid var(--line);
+    border-radius: 1rem;
+    box-shadow: 5px 6px 0 var(--offset);
+  }
+  .card-strong {
+    background: var(--panel);
+    border: 3px solid var(--line);
+    border-radius: 1rem;
+    box-shadow: 7px 8px 0 var(--offset);
+  }
+  .card-pad {
+    padding: 1.5rem;
+  }
+  @media (min-width: 640px) {
+    .card-pad {
+      padding: 1.75rem;
+    }
+  }
+
+  /* --- buttons --- */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    min-height: 3rem;
+    padding: 0.7rem 1.4rem;
+    border-radius: 999px;
+    border: 2px solid var(--ink);
+    font-family: "Unbounded", sans-serif;
+    font-weight: 800;
+    font-size: 0.9rem;
+    line-height: 1;
+    cursor: pointer;
+    transition:
+      transform 160ms ease,
+      box-shadow 160ms ease,
+      background-color 160ms ease,
+      filter 160ms ease;
+  }
+  .btn-primary {
+    color: var(--ink);
+    background: linear-gradient(135deg, var(--gold-light) 0%, var(--gold-deep) 100%);
+    box-shadow: 4px 5px 0 var(--offset);
+  }
+  .btn-primary:hover {
+    filter: brightness(1.05);
+    box-shadow: 6px 7px 0 var(--offset);
+    transform: translate(-1px, -1px);
+  }
+  .btn-ghost {
+    color: var(--ivory);
+    background: var(--raised);
+    border-color: var(--line);
+    box-shadow: 4px 5px 0 var(--offset);
+  }
+  .btn-ghost:hover {
+    background: #2c2447;
+    box-shadow: 6px 7px 0 var(--offset);
+    transform: translate(-1px, -1px);
+  }
+  .btn:active {
+    box-shadow: 2px 3px 0 var(--offset);
+    transform: translate(0, 0);
+  }
+  .btn:disabled {
+    cursor: not-allowed;
+    filter: grayscale(0.4) brightness(0.8);
+    box-shadow: 2px 3px 0 var(--offset);
+    transform: none;
+  }
+
+  /* --- inputs --- */
+  .field {
+    width: 100%;
+    color: var(--ivory);
+    background: var(--raised);
+    border: 2px solid var(--line);
+    border-radius: 0.7rem;
+    box-shadow: 2px 3px 0 var(--offset);
+    padding: 0.85rem 1rem;
+    font-family: "Unbounded", sans-serif;
+    font-size: 0.95rem;
+    transition:
+      box-shadow 160ms ease,
+      transform 160ms ease,
+      background-color 160ms ease;
+  }
+  .field::placeholder {
+    color: #6d6580;
+  }
+  .field:focus {
+    outline: none;
+    background: #2b2345;
+    box-shadow: 3px 4px 0 var(--gold-deep);
+    transform: translate(-1px, -1px);
+  }
+  select.field {
+    appearance: none;
+    background-image: linear-gradient(45deg, transparent 50%, var(--gold-light) 50%),
+      linear-gradient(135deg, var(--gold-light) 50%, transparent 50%);
+    background-position:
+      calc(100% - 18px) center,
+      calc(100% - 13px) center;
+    background-size:
+      5px 5px,
+      5px 5px;
+    background-repeat: no-repeat;
+    padding-right: 2.25rem;
+  }
+  .field[type="number"] {
+    appearance: textfield;
+    -moz-appearance: textfield;
+  }
+  .field[type="number"]::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+
+  /* --- labels / eyebrows --- */
+  .label {
+    font-size: 0.65rem;
+    font-weight: 800;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .eyebrow {
+    font-size: 0.7rem;
+    font-weight: 800;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--gold-deep);
+  }
+
+  /* --- badges / pills --- */
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.3rem 0.7rem;
+    border: 2px solid var(--ink);
+    border-radius: 999px;
+    background: var(--gold-light);
+    color: var(--ink);
+    font-size: 0.65rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    box-shadow: 2px 3px 0 var(--offset);
+  }
+  .badge-live {
+    background: var(--usdcx);
+  }
+
+  /* --- token tile: a bright chip carrying the token colour --- */
+  .token-tile {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid var(--ink);
+    border-radius: 0.6rem;
+    box-shadow: 2px 3px 0 var(--offset);
+    font-family: "Big Shoulders Display", sans-serif;
+    font-weight: 800;
+    color: var(--ink);
+  }
+
+  /* --- tab rail --- */
+  .tab {
+    padding: 0.55rem 1rem;
+    border-radius: 999px;
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    color: var(--muted);
+    border: 2px solid transparent;
+    transition:
+      color 140ms ease,
+      background-color 140ms ease,
+      box-shadow 140ms ease;
+  }
+  .tab-active {
+    color: var(--ink);
+    background: var(--gold-light);
+    border-color: var(--ink);
+    box-shadow: 2px 3px 0 var(--offset);
+  }
+
+  /* --- the 3D echo hero --- */
+  .echo-stage {
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: min(20rem, 74vw);
+    aspect-ratio: 1;
+    margin-inline: auto;
+    perspective: 900px;
+  }
+  .echo-ring {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 100%;
+    height: 100%;
+    border-radius: 999px;
+    border: 2px solid var(--gold-deep);
+    transform: translate(-50%, -50%);
+    animation: echo 3.6s ease-out infinite;
+  }
+  .echo-medallion {
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: 62%;
+    aspect-ratio: 1;
+    border-radius: 1.4rem;
+    background: linear-gradient(150deg, #211a33 0%, #100c1c 100%);
+    border: 3px solid var(--line);
+    box-shadow:
+      7px 8px 0 var(--offset),
+      inset 0 0 46px rgba(217, 168, 92, 0.28);
+    transform-style: preserve-3d;
+    animation: float 6s ease-in-out infinite;
+    will-change: transform;
+  }
+  .echo-glow {
+    position: absolute;
+    inset: -18% -18% -30% -18%;
+    z-index: -1;
+    border-radius: 999px;
+    background: radial-gradient(closest-side, rgba(217, 168, 92, 0.5), transparent 72%);
+    filter: blur(6px);
+  }
+
+  /* --- marquee of example commands --- */
+  .marquee {
+    display: flex;
+    width: 100%;
+    overflow: hidden;
+    -webkit-mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
+    mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
+  }
+  .marquee-track {
+    display: flex;
+    flex-shrink: 0;
+    gap: 0.75rem;
+    padding-right: 0.75rem; /* trailing gap before the loop seam */
+    animation: marquee 46s linear infinite;
+  }
+  .marquee:hover .marquee-track {
+    animation-play-state: paused;
+  }
+  .cmd-chip {
+    display: inline-flex;
+    align-items: center;
+    white-space: nowrap;
+    padding: 0.5rem 1rem;
+    border: 2px solid var(--ink);
+    border-radius: 999px;
+    background: var(--raised);
+    color: var(--ivory);
+    font-size: 0.78rem;
+    font-weight: 600;
+    box-shadow: 2px 3px 0 var(--offset);
+  }
+  .cmd-chip b {
+    color: var(--gold-light);
+    font-weight: 800;
+  }
+
+  /* the waterline: public above, private beneath */
   .waterline {
-    @apply relative h-px w-full origin-center animate-draw;
+    height: 2px;
+    border-radius: 999px;
     background: linear-gradient(
       90deg,
       transparent,
-      rgb(242 235 220 / 0.16) 12%,
-      rgb(246 223 164 / 0.5) 50%,
-      rgb(242 235 220 / 0.16) 88%,
+      var(--gold-deep) 18%,
+      var(--gold-light) 50%,
+      var(--gold-deep) 82%,
       transparent
     );
-  }
-
-  .waterline::after {
-    content: "";
-    @apply absolute inset-x-0 -top-px h-[3px] animate-drift blur-[3px];
-    background: linear-gradient(90deg, transparent, rgb(246 223 164 / 0.32) 50%, transparent);
-    background-size: 55% 100%;
-    background-repeat: no-repeat;
-  }
-
-  .eyebrow {
-    @apply text-[0.6875rem] font-bold uppercase tracking-label text-ivory/30;
-  }
-
-  .label {
-    @apply text-[0.6875rem] font-bold uppercase tracking-label text-ivory/50;
-  }
-
-  .card {
-    @apply rounded-2xl border border-ivory/10 bg-ivory/[0.035] p-5;
-  }
-
-  .input {
-    @apply w-full rounded-xl border border-ivory/10 bg-black/25 px-4 py-3
-           transition placeholder:text-ivory/25 hover:border-ivory/20
-           focus:border-gold focus:bg-black/40 focus:outline-none;
-  }
-
-  .btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-full px-6 py-3
-           text-sm font-bold tracking-wide transition active:translate-y-px
-           disabled:cursor-progress disabled:opacity-50;
-  }
-
-  .btn-primary {
-    @apply btn bg-gradient-to-br from-gold-light to-gold-deep text-[#17120a] hover:brightness-110;
-  }
-
-  .btn-ghost {
-    @apply btn border border-ivory/15 text-ivory/70 hover:border-ivory/30 hover:text-ivory;
+    box-shadow: 0 0 18px rgba(217, 168, 92, 0.55);
   }
 
   .num {
-    @apply font-num tabular-nums;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
   }
-
-  /* Value is the only thing that gets to be gold. */
   .value {
-    @apply num bg-gradient-to-br from-gold-light to-gold-deep bg-clip-text text-transparent;
+    color: var(--gold-light);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * {
+      animation: none !important;
+    }
+  }
+}
+
+/* Keyframes the component layer drives by name. Kept out of Tailwind's config
+   so they always ship: Tailwind only emits its own @keyframes when a matching
+   animate-* utility appears in markup, and .echo-ring / .marquee-track use
+   `animation: <name>` directly. */
+@keyframes echo {
+  0% {
+    opacity: 0.55;
+    transform: translate(-50%, -50%) scale(0.35);
+  }
+  80% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(1.9);
+  }
+}
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-12px);
+  }
+}
+@keyframes marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    /* padding-right on the track supplies the seam gap, so exactly -50%. */
+    transform: translateX(-50%);
   }
 }

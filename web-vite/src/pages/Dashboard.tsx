@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
-import { Navigate, NavLink, useParams, Link } from "react-router-dom";
+import { Navigate, NavLink, useParams, useSearchParams, Link } from "react-router-dom";
 import { ArrowDownLeft, ArrowUpRight, Sparkles } from "lucide-react";
-import { Header, Shell, Spinner, Waterline } from "../components/Layout";
+import { Frame, Header, Shell, Spinner, Waterline } from "../components/Layout";
+import { TokenIcon } from "../components/TokenIcon";
 import { useAuth } from "../contexts/useAuth";
 import { api, type Activity, type CampaignResult, type SendResult } from "../lib/api";
 import { ASSET_LABEL, money, parseHandles, timeAgo } from "../lib/format";
@@ -12,28 +13,61 @@ const TABS = [
   { id: "campaign", label: "Pay many" },
 ] as const;
 
+/** Segmented token picker: a bright chip per asset, ink-on-gold when chosen. */
+function AssetPicker({
+  assets,
+  value,
+  onChange,
+}: {
+  assets: string[];
+  value: string;
+  onChange: (a: string) => void;
+}) {
+  return (
+    <div className="flex flex-wrap gap-2">
+      {assets.map((a) => {
+        const active = a === value;
+        return (
+          <button
+            type="button"
+            key={a}
+            onClick={() => onChange(a)}
+            className={`flex items-center gap-2 rounded-full border-2 px-3 py-1.5 text-xs font-extrabold transition ${
+              active
+                ? "border-ink bg-gold-light text-ink shadow-neo-sm"
+                : "border-line/30 text-muted hover:border-line hover:text-ivory"
+            }`}
+          >
+            <TokenIcon asset={a} size={20} />
+            {ASSET_LABEL[a] ?? a}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 function Balances({ assets, balances }: { assets: string[]; balances: Record<string, number> }) {
   const empty = assets.every((a) => !balances[a]);
   return (
-    <section className="pt-6">
-      <p className="eyebrow">Beneath the surface</p>
-      <ul className="mt-4">
+    <section className="card-strong card-pad">
+      <p className="eyebrow">Beneath the surface · private balances</p>
+      <ul className="mt-4 grid gap-3">
         {assets.map((asset, i) => {
           const amount = balances[asset] ?? 0;
           return (
             <li
               key={asset}
-              className="flex animate-rise items-baseline justify-between gap-4 border-b border-ivory/10 py-3 last:border-0"
-              style={{ animationDelay: `${80 + i * 70}ms` }}
+              className="flex animate-rise items-center gap-3 border-b border-ivory/10 pb-3 last:border-0 last:pb-0"
+              style={{ animationDelay: `${60 + i * 60}ms` }}
             >
-              <span className="text-xs font-bold tracking-wider text-ivory/50">
-                {ASSET_LABEL[asset] ?? asset}
-              </span>
+              <TokenIcon asset={asset} size={40} />
+              <span className="font-display text-lg font-extrabold">{ASSET_LABEL[asset] ?? asset}</span>
               <span
                 className={
                   amount === 0
-                    ? "num text-[clamp(1.35rem,5vw,1.85rem)] font-medium text-ivory/30"
-                    : "value text-[clamp(1.35rem,5vw,1.85rem)] font-medium"
+                    ? "num ml-auto text-[clamp(1.35rem,5vw,1.9rem)] font-medium text-ivory/25"
+                    : "value ml-auto text-[clamp(1.35rem,5vw,1.9rem)] font-medium"
                 }
               >
                 {money(amount)}
@@ -42,14 +76,10 @@ function Balances({ assets, balances }: { assets: string[]; balances: Record<str
           );
         })}
       </ul>
-      <p className="mt-4 max-w-lg text-[0.8125rem] text-ivory/30">
+      <p className="mt-4 text-xs leading-relaxed text-muted">
         Only you, the person you paid, and the operator can see these amounts. Nothing here is public.
+        {empty && " Your wallet fills the moment someone sends you something."}
       </p>
-      {empty && (
-        <p className="mt-2 max-w-lg text-[0.8125rem] text-ivory/30">
-          Your wallet fills up the moment someone sends you something.
-        </p>
-      )}
     </section>
   );
 }
@@ -57,46 +87,50 @@ function Balances({ assets, balances }: { assets: string[]; balances: Record<str
 function ActivityFeed({ entries }: { entries: Activity[] }) {
   if (!entries.length) {
     return (
-      <p className="py-6 text-[0.8125rem] text-ivory/30">
-        No payments yet. Send one and it shows up here.
-      </p>
+      <div className="card-pad text-center">
+        <p className="text-sm text-muted">No payments yet. Send one and it shows up here.</p>
+      </div>
     );
   }
   return (
-    <ul>
+    <ul className="card">
       {entries.map((e) => {
         const inbound = e.direction === "in";
         const row = (
           <>
-            <span className={inbound ? "text-gold" : "text-ivory/30"}>
+            <span
+              className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border-2 border-ink ${
+                inbound ? "bg-usdcx" : "bg-raised text-ivory"
+              }`}
+            >
               {inbound ? <ArrowDownLeft size={16} /> : <ArrowUpRight size={16} />}
             </span>
             <span className="num font-semibold">{money(e.amount)}</span>
-            <span className="text-xs font-bold tracking-wider text-ivory/50">
+            <span className="text-xs font-bold tracking-wider text-muted">
               {ASSET_LABEL[e.asset] ?? e.asset}
             </span>
-            <span className="text-ivory/50">{inbound ? `from ${e.from}` : `to ${e.to}`}</span>
+            <span className="text-sm text-muted">{inbound ? `from ${e.from}` : `to ${e.to}`}</span>
             {!inbound && e.onboarded && (
-              <span className="rounded-full border border-gold-deep/40 px-2 py-0.5 text-[0.625rem] font-bold uppercase tracking-wider text-gold-deep">
+              <span className="rounded-full border-2 border-ink bg-gold-light px-2 py-0.5 text-[0.625rem] font-extrabold uppercase tracking-wide text-ink">
                 new wallet
               </span>
             )}
-            <span className="ml-auto hidden text-[0.8125rem] text-ivory/30 sm:inline">
+            <span className="ml-auto hidden text-xs text-muted sm:inline">
               {e.memo || timeAgo(e.ts)}
             </span>
           </>
         );
         return (
-          <li key={e.id ?? `${e.ts}-${e.to}`} className="border-b border-ivory/10 last:border-0">
+          <li key={e.id ?? `${e.ts}-${e.to}`} className="border-b-2 border-ink/60 last:border-0">
             {e.id ? (
               <Link
                 to={`/tx/${e.id}`}
-                className="flex items-center gap-3 py-3 transition hover:opacity-80"
+                className="flex items-center gap-3 px-5 py-3.5 transition hover:bg-raised/60"
               >
                 {row}
               </Link>
             ) : (
-              <div className="flex items-center gap-3 py-3">{row}</div>
+              <div className="flex items-center gap-3 px-5 py-3.5">{row}</div>
             )}
           </li>
         );
@@ -105,8 +139,32 @@ function ActivityFeed({ entries }: { entries: Activity[] }) {
   );
 }
 
-function SendPanel({ assets, onDone }: { assets: string[]; onDone: () => void }) {
-  const [to, setTo] = useState("");
+function Result({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="animate-rise rounded-2xl border-2 border-gold-light/40 bg-gold-light/[0.07] p-5 shadow-neo-sm">
+      {children}
+    </div>
+  );
+}
+
+function ErrorNote({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="rounded-xl border-2 border-orange-400/40 bg-orange-400/10 px-4 py-3 text-sm text-orange-100">
+      {children}
+    </p>
+  );
+}
+
+function SendPanel({
+  assets,
+  presetTo,
+  onDone,
+}: {
+  assets: string[];
+  presetTo?: string;
+  onDone: () => void;
+}) {
+  const [to, setTo] = useState(presetTo ?? "");
   const [amount, setAmount] = useState("");
   const [asset, setAsset] = useState(assets[0] ?? "CC");
   const [memo, setMemo] = useState("");
@@ -137,16 +195,16 @@ function SendPanel({ assets, onDone }: { assets: string[]; onDone: () => void })
   }
 
   return (
-    <form onSubmit={submit} className="grid gap-5 py-2">
+    <form onSubmit={submit} className="card card-pad grid gap-5">
       <div className="grid gap-2">
         <label className="label" htmlFor="to">
           To
         </label>
         <div className="relative flex items-center">
-          <span className="pointer-events-none absolute left-4 text-ivory/30">@</span>
+          <span className="pointer-events-none absolute left-4 font-bold text-muted">@</span>
           <input
             id="to"
-            className="input pl-8"
+            className="field pl-8"
             value={to}
             onChange={(e) => setTo(e.target.value)}
             placeholder="handle"
@@ -154,52 +212,38 @@ function SendPanel({ assets, onDone }: { assets: string[]; onDone: () => void })
             spellCheck={false}
           />
         </div>
-        <p className="text-xs text-ivory/30">
+        <p className="text-xs text-muted">
           They don't need an account. If they've never used Selkie, this creates their wallet.
         </p>
       </div>
 
-      <div className="flex flex-wrap gap-3">
-        <div className="grid flex-1 basis-32 gap-2">
-          <label className="label" htmlFor="amount">
-            Amount
-          </label>
-          <input
-            id="amount"
-            className="input num"
-            inputMode="decimal"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            placeholder="0.00"
-            autoComplete="off"
-          />
-        </div>
-        <div className="grid gap-2">
-          <label className="label" htmlFor="asset">
-            Asset
-          </label>
-          <select
-            id="asset"
-            className="input num pr-8"
-            value={asset}
-            onChange={(e) => setAsset(e.target.value)}
-          >
-            {assets.map((a) => (
-              <option key={a} value={a} className="bg-ink">
-                {ASSET_LABEL[a] ?? a}
-              </option>
-            ))}
-          </select>
-        </div>
+      <div className="grid gap-2">
+        <label className="label" htmlFor="amount">
+          Amount
+        </label>
+        <input
+          id="amount"
+          className="field num"
+          inputMode="decimal"
+          value={amount}
+          onChange={(e) => setAmount(e.target.value)}
+          placeholder="0.00"
+          autoComplete="off"
+        />
+      </div>
+
+      <div className="grid gap-2">
+        <span className="label">Asset</span>
+        <AssetPicker assets={assets} value={asset} onChange={setAsset} />
       </div>
 
       <div className="grid gap-2">
         <label className="label" htmlFor="memo">
-          Note <span className="font-medium normal-case tracking-normal text-ivory/30">optional</span>
+          Note <span className="font-medium normal-case tracking-normal text-muted">optional</span>
         </label>
         <input
           id="memo"
-          className="input"
+          className="field"
           value={memo}
           maxLength={140}
           onChange={(e) => setMemo(e.target.value)}
@@ -212,14 +256,10 @@ function SendPanel({ assets, onDone }: { assets: string[]; onDone: () => void })
         {busy ? "Sending…" : "Send"}
       </button>
 
-      {error && (
-        <p className="rounded-xl border border-orange-400/30 bg-orange-400/10 px-4 py-3 text-[0.8125rem] text-orange-100">
-          {error}
-        </p>
-      )}
+      {error && <ErrorNote>{error}</ErrorNote>}
 
       {result && (
-        <div className="animate-rise rounded-2xl border border-gold-light/25 bg-gold-light/[0.06] p-5">
+        <Result>
           <p>
             Sent{" "}
             <span className="num font-semibold text-gold-light">
@@ -227,12 +267,12 @@ function SendPanel({ assets, onDone }: { assets: string[]; onDone: () => void })
             </span>{" "}
             to <strong>{result.to}</strong>.
           </p>
-          <p className="mt-2 text-[0.8125rem] text-ivory/50">
+          <p className="mt-2 text-sm text-muted">
             {result.onboarded
               ? `${result.to} had no wallet. Selkie made one, and the money is already theirs.`
               : "Settled on Canton. The amount stays between you two."}
           </p>
-        </div>
+        </Result>
       )}
     </form>
   );
@@ -257,12 +297,7 @@ function CampaignPanel({ assets, onDone }: { assets: string[]; onDone: () => voi
 
     setBusy(true);
     try {
-      const res = await api.campaign({
-        winners,
-        asset,
-        amountEach: value,
-        memo: memo || "reward",
-      });
+      const res = await api.campaign({ winners, asset, amountEach: value, memo: memo || "reward" });
       setResult(res);
       setRaw("");
       setAmount("");
@@ -276,65 +311,51 @@ function CampaignPanel({ assets, onDone }: { assets: string[]; onDone: () => voi
   }
 
   return (
-    <form onSubmit={submit} className="grid gap-5 py-2">
+    <form onSubmit={submit} className="card card-pad grid gap-5">
       <div className="grid gap-2">
         <label className="label" htmlFor="winners">
           Winners
         </label>
         <textarea
           id="winners"
-          className="input min-h-[6rem] resize-y leading-relaxed"
+          className="field min-h-[6rem] resize-y leading-relaxed"
           value={raw}
           onChange={(e) => setRaw(e.target.value)}
           placeholder={"@ada @bayo @chidi\none per line, or separated by spaces"}
         />
-        <p className="text-xs text-ivory/30">
-          <span className="num text-ivory/60">{winners.length}</span> handles. Each one gets the amount
+        <p className="text-xs text-muted">
+          <span className="num text-ivory/80">{winners.length}</span> handles. Each one gets the amount
           below.
         </p>
       </div>
 
-      <div className="flex flex-wrap gap-3">
-        <div className="grid flex-1 basis-32 gap-2">
-          <label className="label" htmlFor="each">
-            Amount each
-          </label>
-          <input
-            id="each"
-            className="input num"
-            inputMode="decimal"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            placeholder="0.00"
-            autoComplete="off"
-          />
-        </div>
-        <div className="grid gap-2">
-          <label className="label" htmlFor="campaign-asset">
-            Asset
-          </label>
-          <select
-            id="campaign-asset"
-            className="input num pr-8"
-            value={asset}
-            onChange={(e) => setAsset(e.target.value)}
-          >
-            {assets.map((a) => (
-              <option key={a} value={a} className="bg-ink">
-                {ASSET_LABEL[a] ?? a}
-              </option>
-            ))}
-          </select>
-        </div>
+      <div className="grid gap-2">
+        <label className="label" htmlFor="each">
+          Amount each
+        </label>
+        <input
+          id="each"
+          className="field num"
+          inputMode="decimal"
+          value={amount}
+          onChange={(e) => setAmount(e.target.value)}
+          placeholder="0.00"
+          autoComplete="off"
+        />
+      </div>
+
+      <div className="grid gap-2">
+        <span className="label">Asset</span>
+        <AssetPicker assets={assets} value={asset} onChange={setAsset} />
       </div>
 
       <div className="grid gap-2">
         <label className="label" htmlFor="campaign-memo">
-          Note <span className="font-medium normal-case tracking-normal text-ivory/30">optional</span>
+          Note <span className="font-medium normal-case tracking-normal text-muted">optional</span>
         </label>
         <input
           id="campaign-memo"
-          className="input"
+          className="field"
           value={memo}
           maxLength={140}
           onChange={(e) => setMemo(e.target.value)}
@@ -347,14 +368,10 @@ function CampaignPanel({ assets, onDone }: { assets: string[]; onDone: () => voi
         {busy ? `Paying ${winners.length}…` : winners.length ? `Pay ${winners.length}` : "Pay everyone"}
       </button>
 
-      {error && (
-        <p className="rounded-xl border border-orange-400/30 bg-orange-400/10 px-4 py-3 text-[0.8125rem] text-orange-100">
-          {error}
-        </p>
-      )}
+      {error && <ErrorNote>{error}</ErrorNote>}
 
       {result && (
-        <div className="animate-rise rounded-2xl border border-gold-light/25 bg-gold-light/[0.06] p-5">
+        <Result>
           <div className="flex flex-wrap gap-8">
             {[
               ["paid", result.paid],
@@ -363,18 +380,16 @@ function CampaignPanel({ assets, onDone }: { assets: string[]; onDone: () => voi
             ].map(([label, value]) => (
               <div key={label as string} className="grid gap-1">
                 <span className="num text-4xl font-medium leading-none text-gold-light">{value}</span>
-                <span className="text-[0.6875rem] font-bold uppercase tracking-wider text-ivory/30">
-                  {label}
-                </span>
+                <span className="label">{label}</span>
               </div>
             ))}
           </div>
-          <p className="mt-4 text-[0.8125rem] text-ivory/50">
+          <p className="mt-4 text-sm text-muted">
             {result.failed.length
               ? result.failed.map((f) => `${f.handle}: ${f.error}`).join(" · ")
               : "Every winner was paid. Nobody had to claim anything."}
           </p>
-        </div>
+        </Result>
       )}
     </form>
   );
@@ -383,6 +398,7 @@ function CampaignPanel({ assets, onDone }: { assets: string[]; onDone: () => voi
 export function Dashboard() {
   const { me, loading } = useAuth();
   const { tab } = useParams<{ tab: string }>();
+  const [search] = useSearchParams();
   const [balances, setBalances] = useState<Record<string, number>>({});
   const [entries, setEntries] = useState<Activity[]>([]);
 
@@ -401,56 +417,57 @@ export function Dashboard() {
   if (!me) return <Navigate to="/" replace />;
   if (!tab || !TABS.some((t) => t.id === tab)) return <Navigate to="/dashboard/activity" replace />;
 
+  const presetTo = search.get("to") ?? undefined;
+
   return (
-    <>
+    <Frame>
       <Header />
       <main className="pb-20">
         <Shell>
-          <section className="pt-6">
+          <section className="pt-4">
             <p className="eyebrow">Your handle, on the surface</p>
-            <h1 className="mt-1.5 text-[clamp(1.5rem,6vw,2.25rem)] font-extrabold -tracking-[0.02em]">
+            <h1 className="mt-1.5 font-display text-[clamp(1.75rem,7vw,2.75rem)] font-extrabold uppercase">
               {me.handle}
             </h1>
           </section>
         </Shell>
 
-        <div className="mt-5">
+        <div className="my-5">
           <Waterline />
         </div>
 
         <Shell>
           <Balances assets={me.assets} balances={balances} />
 
-          <nav className="mt-10 flex gap-1 rounded-full bg-black/25 p-1" role="tablist">
+          <nav
+            className="mt-8 flex flex-wrap gap-1 rounded-full border-2 border-line/20 bg-black/25 p-1"
+            role="tablist"
+          >
             {TABS.map((t) => (
               <NavLink
                 key={t.id}
                 to={`/dashboard/${t.id}`}
                 role="tab"
-                className={({ isActive }) =>
-                  `rounded-full px-4 py-2 text-xs font-bold tracking-wide transition ${
-                    isActive ? "bg-ivory/10 text-ivory" : "text-ivory/50 hover:text-ivory"
-                  }`
-                }
+                className={({ isActive }) => `tab ${isActive ? "tab-active" : ""}`}
               >
                 {t.label}
               </NavLink>
             ))}
           </nav>
 
-          <div className="card mt-4">
+          <div className="mt-4">
             {tab === "activity" && <ActivityFeed entries={entries} />}
-            {tab === "send" && <SendPanel assets={me.assets} onDone={refresh} />}
+            {tab === "send" && <SendPanel assets={me.assets} presetTo={presetTo} onDone={refresh} />}
             {tab === "campaign" && <CampaignPanel assets={me.assets} onDone={refresh} />}
           </div>
 
           {tab === "activity" && entries.length > 0 && (
-            <p className="mt-4 flex items-center gap-2 text-[0.8125rem] text-ivory/30">
+            <p className="mt-4 flex items-center gap-2 text-xs text-muted">
               <Sparkles size={14} /> Tap any payment to see its receipt.
             </p>
           )}
         </Shell>
       </main>
-    </>
+    </Frame>
   );
 }

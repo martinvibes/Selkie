@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { Header, Shell, Spinner, Waterline } from "../components/Layout";
+import { ArrowRight, Lock } from "lucide-react";
+import { Frame, Header, Shell, Spinner, Waterline } from "../components/Layout";
+import { Mark } from "../components/Mark";
 import { api, type PublicAccount } from "../lib/api";
 import { useAuth } from "../contexts/useAuth";
 
@@ -19,6 +21,7 @@ export function Account() {
 
   useEffect(() => {
     let cancelled = false;
+    setLoading(true);
     api
       .account(handle)
       .then((a) => !cancelled && setAccount(a))
@@ -35,51 +38,54 @@ export function Account() {
   const isMe = me?.handle === shown;
 
   return (
-    <>
+    <Frame>
       <Header />
-      <main className="flex min-h-[calc(100vh-5rem)] flex-col justify-center py-10">
+      <main className="flex min-h-[calc(100vh-6rem)] flex-col justify-center py-10">
         <Shell>
-          <div className="animate-rise text-center">
-            <p className="eyebrow">On the surface</p>
-            <h1 className="mt-2 text-[clamp(1.75rem,7vw,2.75rem)] font-extrabold -tracking-[0.02em]">
+          <div className="card-strong card-pad mx-auto max-w-md animate-rise text-center">
+            <span className="mx-auto inline-flex h-16 w-16 items-center justify-center rounded-2xl border-2 border-ink bg-gold-light shadow-neo-sm">
+              <Mark size={34} />
+            </span>
+
+            <p className="eyebrow mt-5">On the surface</p>
+            <h1 className="mt-2 font-display text-[clamp(2rem,8vw,3rem)] font-extrabold uppercase">
               {shown}
             </h1>
-          </div>
-        </Shell>
 
-        <div className="my-6">
-          <Waterline full />
-        </div>
+            <div className="my-5">
+              <Waterline full />
+            </div>
 
-        <Shell>
-          <div className="text-center">
-            <p className="eyebrow text-gold-light/40">Beneath it</p>
-            <p className="mx-auto mt-4 max-w-sm text-lg text-ivory/70">
+            <p className="eyebrow text-gold-light/50">Beneath it</p>
+            <p className="mx-auto mt-3 max-w-xs text-ivory/80">
               Private. Only {shown} can see what's here.
             </p>
-            <p className="mx-auto mt-4 max-w-md text-[0.8125rem] text-ivory/30">
+            <p className="mx-auto mt-3 max-w-sm text-xs leading-relaxed text-muted">
               {account?.exists
                 ? "This handle has a Selkie wallet and can be paid right now."
-                : "This handle doesn't have a wallet yet. Send them something and Selkie creates one for them."}
+                : "This handle has no wallet yet. Send something and Selkie creates one as it settles."}
             </p>
 
-            <div className="mt-8">
+            <div className="mt-7">
               {me ? (
                 <a
                   href={isMe ? "/dashboard/activity" : `/dashboard/send?to=${shown.replace("@", "")}`}
                   className="btn-primary"
                 >
-                  {isMe ? "Go to your wallet" : `Send to ${shown}`}
+                  {isMe ? "Go to your wallet" : `Send to ${shown}`} <ArrowRight size={16} />
                 </a>
               ) : (
                 <a href="/auth/x/login" className="btn-primary">
-                  Continue with X to send
+                  Continue with X to send <ArrowRight size={16} />
                 </a>
               )}
             </div>
+            <p className="mt-4 flex items-center justify-center gap-2 text-xs text-muted">
+              <Lock size={12} /> No public balance, ever.
+            </p>
           </div>
         </Shell>
       </main>
-    </>
+    </Frame>
   );
 }
