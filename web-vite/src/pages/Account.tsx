@@ -46,34 +46,32 @@ export function Account() {
       <Header />
       <main className="flex min-h-[calc(100vh-4rem)] flex-col justify-center py-12">
         <Shell>
-          <div className="glass-strong mx-auto w-full max-w-md animate-rise overflow-hidden p-8 text-center sm:p-10">
-            <span className="orb -top-32 left-1/2 h-72 w-72 -translate-x-1/2 bg-gold/15" />
-
-            <span className="mx-auto grid h-16 w-16 place-items-center rounded-full border border-gold/30 bg-gradient-to-br from-white/10 to-white/[0.02] text-gold-light">
+          <div className="chunk mx-auto w-full max-w-md animate-rise p-8 text-center sm:p-10">
+            <span className="mx-auto grid h-16 w-16 place-items-center rounded-full border-2 border-pen bg-[#f7ecd2] text-gold-ink">
               <AtSign size={26} />
             </span>
 
             <h1 className="mt-5 font-display text-[clamp(1.9rem,7vw,2.6rem)] font-bold tracking-tight">
               {shown}
             </h1>
-            <p className="mt-2 text-sm text-ivory/50">
+            <p className="mt-2 text-sm font-medium text-pen/60">
               {account?.exists
                 ? "Has a Selkie wallet and can be paid right now."
                 : "No wallet yet. The first payment creates it."}
             </p>
 
-            <div className="glow-line my-6" />
+            <div className="rule my-6" />
 
             <ul className="mx-auto max-w-[15rem] text-left">
               {PRIVATE_ROWS.map((asset) => (
                 <li key={asset} className="flex items-center gap-3 py-2">
                   <TokenIcon asset={asset} size={24} />
-                  <span className="h-3.5 w-24 rounded-full bg-ivory/20 blur-[5px]" aria-hidden="true" />
-                  <Lock size={11} className="ml-auto text-ivory/30" />
+                  <span className="h-3.5 w-24 rounded-full bg-pen/25 blur-[5px]" aria-hidden="true" />
+                  <Lock size={11} className="ml-auto text-pen/40" />
                 </li>
               ))}
             </ul>
-            <p className="mx-auto mt-3 max-w-xs text-xs leading-relaxed text-ivory/40">
+            <p className="mx-auto mt-3 max-w-xs text-xs font-medium leading-relaxed text-pen/50">
               Balances are private on Canton. Only {shown} can see them.
             </p>
 

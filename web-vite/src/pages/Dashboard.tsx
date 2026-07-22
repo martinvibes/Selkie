@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type SubmitEvent } from "react";
 import { Link, Navigate, NavLink, useParams, useSearchParams } from "react-router-dom";
 import {
+  Activity as ActivityIcon,
   AlertTriangle,
   ArrowDownLeft,
   ArrowUpRight,
@@ -9,19 +10,20 @@ import {
   Inbox,
   Link2,
   Lock,
+  Send,
   Sparkles,
 } from "lucide-react";
 import { Avatar, Header, Shell, Spinner } from "../components/Layout";
 import { TokenIcon } from "../components/TokenIcon";
 import { useAuth } from "../contexts/useAuth";
 import { useToast } from "../contexts/ToastContext";
-import { api, type Activity, type CampaignResult, type Reserve, type SendResult } from "../lib/api";
+import { api, type Activity, type CampaignResult, type Me, type Reserve, type SendResult } from "../lib/api";
 import { ASSET_LABEL, money, parseHandles, timeAgo } from "../lib/format";
 
 const TABS = [
-  { id: "activity", label: "Activity" },
-  { id: "send", label: "Send" },
-  { id: "campaign", label: "Pay many" },
+  { id: "activity", label: "Activity", icon: <ActivityIcon size={19} /> },
+  { id: "send", label: "Send", icon: <Send size={18} /> },
+  { id: "campaign", label: "Pay many", icon: <Sparkles size={18} /> },
 ] as const;
 
 /** Copyable pay page link: the shareable half of "your handle is your wallet". */
@@ -41,10 +43,47 @@ function PayLink({ handle }: { handle: string }) {
   }
 
   return (
-    <button onClick={copy} className="btn btn-dim btn-sm ml-auto shrink-0">
+    <button onClick={copy} className="btn btn-dim btn-sm shrink-0">
       {copied ? <Check size={14} /> : <Link2 size={14} />}
       {copied ? "Copied" : "Pay link"}
     </button>
+  );
+}
+
+/** The gold card: who you are and what your handle holds, front and center. */
+function HeroCard({ me, balances }: { me: Me; balances: Record<string, number> }) {
+  const cc = balances.CC ?? 0;
+  return (
+    <section className="chunk-gold p-6 sm:p-7">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3.5">
+          <Avatar me={me} size={46} />
+          <div className="leading-tight">
+            <p className="eyebrow">Private wallet · Canton</p>
+            <h1 className="mt-0.5 font-display text-2xl font-bold tracking-tight">{me.handle}</h1>
+          </div>
+        </div>
+        <span className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border-2 border-pen/25 bg-white/30 px-3 py-1 text-xs font-bold">
+          <Lock size={11} /> Only you
+        </span>
+      </div>
+
+      <div className="mt-7 flex flex-wrap items-end justify-between gap-5">
+        <div className="flex items-center gap-4">
+          <TokenIcon asset="CC" size={46} />
+          <div className="leading-none">
+            <p className="num text-[clamp(2.5rem,7vw,3.4rem)] font-bold tracking-tight">{money(cc)}</p>
+            <p className="mt-2 text-sm font-semibold text-pen/60">Canton Coin</p>
+          </div>
+        </div>
+        <div className="flex gap-2.5">
+          <Link to="/dashboard/send" className="btn btn-dim btn-sm">
+            <ArrowUpRight size={15} /> Send
+          </Link>
+          <PayLink handle={me.handle} />
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -75,7 +114,7 @@ function AssetPicker({
   );
 }
 
-function Balances({
+function TokenGrid({
   assets,
   balances,
   reserve,
@@ -86,49 +125,49 @@ function Balances({
 }) {
   const empty = assets.every((a) => !balances[a]);
   return (
-    <section className="glass-strong mt-8 p-6 sm:p-7">
+    <section className="chunk mt-6 p-5 sm:p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="font-display text-lg font-semibold">Balances</p>
-        <span className="flex items-center gap-1.5 text-xs text-ivory/40">
-          <Lock size={12} /> Only you can see these
+        <p className="font-display text-lg font-bold">Balances</p>
+        <span className="flex items-center gap-1.5 text-xs font-semibold text-pen/50">
+          <Lock size={12} /> Private on Canton
         </span>
       </div>
 
-      <ul className="mt-3">
+      <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
         {assets.map((asset, i) => {
           const amount = balances[asset] ?? 0;
           return (
-            <li
+            <div
               key={asset}
-              className="flex animate-rise items-center gap-3.5 border-b border-white/[0.05] py-3.5 last:border-0 last:pb-0"
+              className="animate-rise flex items-center gap-3 rounded-xl border-2 border-pen bg-card-bright p-4"
               style={{ animationDelay: `${i * 60}ms` }}
             >
-              <TokenIcon asset={asset} size={38} />
-              <div className="leading-tight">
-                <p className="text-[15px] font-semibold">{ASSET_LABEL[asset] ?? asset}</p>
+              <TokenIcon asset={asset} size={36} />
+              <div className="min-w-0 leading-tight">
+                <p className="text-sm font-bold">{ASSET_LABEL[asset] ?? asset}</p>
               </div>
               <span
-                className={`num ml-auto text-[1.45rem] font-medium ${amount === 0 ? "text-ivory/25" : ""}`}
+                className={`num ml-auto text-2xl font-bold ${amount === 0 ? "text-pen/30" : ""}`}
               >
                 {money(amount)}
               </span>
-            </li>
+            </div>
           );
         })}
-      </ul>
+      </div>
 
       {empty && (
-        <p className="mt-4 text-[13px] text-ivory/40">
+        <p className="mt-4 text-[13px] font-medium text-pen/50">
           Your wallet fills the moment someone sends you something.
         </p>
       )}
 
       {reserve?.active && (
-        <p className="mt-4 flex items-center gap-2.5 border-t border-white/[0.05] pt-4 text-[13px] text-ivory/45">
-          <span className="pulse-dot h-1.5 w-1.5 shrink-0 rounded-full bg-gold-light" />
+        <p className="mt-4 flex items-center gap-2.5 border-t-2 border-pen/10 pt-4 text-[13px] font-medium text-pen/60">
+          <span className="pulse-dot h-1.5 w-1.5 shrink-0 rounded-full bg-gold-deep" />
           <span>
             cBTC backed by a live reserve on {reserve.network}:{" "}
-            <span className="num font-medium text-ivory/75">
+            <span className="num font-bold text-pen/85">
               {money(reserve.total)} {reserve.instrument}
             </span>{" "}
             on ledger · verified {timeAgo(reserve.asOf)}
@@ -142,27 +181,25 @@ function Balances({
 function ActivityFeed({ entries }: { entries: Activity[] }) {
   if (!entries.length) {
     return (
-      <div className="glass p-10 text-center">
-        <span className="mx-auto grid h-12 w-12 place-items-center rounded-full border border-white/10 bg-white/[0.04] text-ivory/35">
+      <div className="chunk p-10 text-center">
+        <span className="mx-auto grid h-12 w-12 place-items-center rounded-xl border-2 border-pen bg-card-bright text-pen/45">
           <Inbox size={20} />
         </span>
-        <p className="mt-4 font-medium">No payments yet.</p>
-        <p className="mt-1 text-sm text-ivory/45">Send one and it shows up here.</p>
+        <p className="mt-4 font-bold">No payments yet.</p>
+        <p className="mt-1 text-sm font-medium text-pen/55">Send one and it shows up here.</p>
       </div>
     );
   }
 
   return (
-    <ul className="glass overflow-hidden">
+    <ul className="chunk overflow-hidden">
       {entries.map((e) => {
         const inbound = e.direction === "in";
         const row = (
           <>
             <span
-              className={`grid h-9 w-9 shrink-0 place-items-center rounded-full border ${
-                inbound
-                  ? "border-emerald-400/25 bg-emerald-400/10 text-emerald-300"
-                  : "border-white/10 bg-white/[0.04] text-ivory/50"
+              className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg border-2 border-pen ${
+                inbound ? "bg-[#e5f2d3] text-[#2f6d33]" : "bg-card-bright text-pen/60"
               }`}
             >
               {inbound ? <ArrowDownLeft size={15} /> : <ArrowUpRight size={15} />}
@@ -172,36 +209,39 @@ function ActivityFeed({ entries }: { entries: Activity[] }) {
 
             <div className="min-w-0 flex-1 leading-snug">
               <p className="flex items-baseline gap-2">
-                <span className="num text-[15px] font-semibold">
+                <span className="num text-[15px] font-bold">
                   {inbound ? "+" : "−"}
                   {money(e.amount)}
                 </span>
-                <span className="text-[13px] text-ivory/45">{ASSET_LABEL[e.asset] ?? e.asset}</span>
+                <span className="text-[13px] font-semibold text-pen/50">
+                  {ASSET_LABEL[e.asset] ?? e.asset}
+                </span>
                 {!inbound && e.onboarded && (
-                  <span className="text-xs font-medium text-gold-light/80">new wallet</span>
+                  <span className="text-xs font-bold text-gold-ink">new wallet</span>
                 )}
               </p>
-              <p className="truncate text-[13px] text-ivory/45">
+              <p className="truncate text-[13px] font-medium text-pen/50">
                 {inbound ? `from ${e.from}` : `to ${e.to}`}
                 {e.memo ? ` · ${e.memo}` : ""}
               </p>
             </div>
 
-            <span className="shrink-0 text-xs text-ivory/35">{timeAgo(e.ts)}</span>
+            <span className="shrink-0 text-xs font-semibold text-pen/40">{timeAgo(e.ts)}</span>
           </>
         );
 
+        const tint = inbound ? "bg-[#f4ecd7]" : "";
         return (
-          <li key={e.id ?? `${e.ts}-${e.to}`} className="border-b border-white/[0.05] last:border-0">
+          <li key={e.id ?? `${e.ts}-${e.to}`} className="border-b-2 border-pen/10 last:border-0">
             {e.id ? (
               <Link
                 to={`/tx/${e.id}`}
-                className="flex items-center gap-3.5 px-5 py-4 transition hover:bg-white/[0.03]"
+                className={`flex items-center gap-3.5 px-5 py-4 transition hover:bg-pen/[0.06] ${tint}`}
               >
                 {row}
               </Link>
             ) : (
-              <div className="flex items-center gap-3.5 px-5 py-4">{row}</div>
+              <div className={`flex items-center gap-3.5 px-5 py-4 ${tint}`}>{row}</div>
             )}
           </li>
         );
@@ -212,7 +252,7 @@ function ActivityFeed({ entries }: { entries: Activity[] }) {
 
 function ErrorNote({ children }: { children: React.ReactNode }) {
   return (
-    <p className="shake flex items-start gap-2.5 rounded-xl border border-rose-400/30 bg-rose-400/10 px-4 py-3 text-sm text-rose-200">
+    <p className="shake flex items-start gap-2.5 rounded-xl border-2 border-pen bg-[#fadfe3] px-4 py-3 text-sm font-semibold text-[#7c1d2c]">
       <AlertTriangle size={15} className="mt-0.5 shrink-0" />
       <span>{children}</span>
     </p>
@@ -221,8 +261,8 @@ function ErrorNote({ children }: { children: React.ReactNode }) {
 
 function ResultNote({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="animate-rise rounded-2xl border border-gold/30 bg-gold/[0.07] p-5">
-      <p className="flex items-center gap-2 font-medium text-gold-light">
+    <div className="animate-rise rounded-xl border-2 border-pen bg-[#f7ecd2] p-5">
+      <p className="flex items-center gap-2 font-bold text-gold-ink">
         <CheckCircle2 size={16} /> {title}
       </p>
       <div className="mt-2.5">{children}</div>
@@ -248,7 +288,7 @@ function SendPanel({
   const [result, setResult] = useState<SendResult | null>(null);
   const toast = useToast();
 
-  async function submit(event: React.FormEvent) {
+  async function submit(event: SubmitEvent) {
     event.preventDefault();
     setError(null);
     const value = Number(amount);
@@ -272,13 +312,13 @@ function SendPanel({
   }
 
   return (
-    <form onSubmit={submit} className="glass grid gap-5 p-6 sm:p-7">
+    <form onSubmit={submit} className="chunk grid gap-5 p-6 sm:p-7">
       <div className="grid gap-2">
         <label className="label" htmlFor="to">
           To
         </label>
         <div className="relative flex items-center">
-          <span className="pointer-events-none absolute left-4 text-ivory/35">@</span>
+          <span className="pointer-events-none absolute left-4 font-semibold text-pen/40">@</span>
           <input
             id="to"
             className="field pl-9"
@@ -289,7 +329,7 @@ function SendPanel({
             spellCheck={false}
           />
         </div>
-        <p className="text-[13px] text-ivory/40">
+        <p className="text-[13px] font-medium text-pen/50">
           They don't need an account. If they've never used Selkie, this creates their wallet.
         </p>
       </div>
@@ -316,7 +356,7 @@ function SendPanel({
 
       <div className="grid gap-2">
         <label className="label" htmlFor="memo">
-          Note <span className="text-ivory/35">(optional)</span>
+          Note <span className="font-medium text-pen/40">(optional)</span>
         </label>
         <input
           id="memo"
@@ -337,13 +377,13 @@ function SendPanel({
 
       {result && (
         <ResultNote title="Payment settled on Canton">
-          <p>
-            <span className="num font-semibold text-gold-light">
+          <p className="font-medium">
+            <span className="num font-bold text-gold-ink">
               {money(result.amount)} {ASSET_LABEL[result.asset] ?? result.asset}
             </span>{" "}
             is now with <strong>{result.to}</strong>.
           </p>
-          <p className="mt-2 text-sm text-ivory/55">
+          <p className="mt-2 text-sm font-medium text-pen/65">
             {result.onboarded
               ? `${result.to} had no wallet. Selkie made one, and the money is already theirs.`
               : "The amount stays between you two."}
@@ -365,7 +405,7 @@ function CampaignPanel({ assets, onDone }: { assets: string[]; onDone: () => voi
   const toast = useToast();
   const winners = parseHandles(raw);
 
-  async function submit(event: React.FormEvent) {
+  async function submit(event: SubmitEvent) {
     event.preventDefault();
     setError(null);
     const value = Number(amount);
@@ -394,7 +434,7 @@ function CampaignPanel({ assets, onDone }: { assets: string[]; onDone: () => voi
   }
 
   return (
-    <form onSubmit={submit} className="glass grid gap-5 p-6 sm:p-7">
+    <form onSubmit={submit} className="chunk grid gap-5 p-6 sm:p-7">
       <div className="grid gap-2">
         <label className="label" htmlFor="winners">
           Winners
@@ -406,9 +446,9 @@ function CampaignPanel({ assets, onDone }: { assets: string[]; onDone: () => voi
           onChange={(e) => setRaw(e.target.value)}
           placeholder={"@ada @bayo @chidi\none per line, or separated by spaces"}
         />
-        <p className="text-[13px] text-ivory/40">
-          <span className="num text-ivory/70">{winners.length}</span> handles. Each one gets the
-          amount below.
+        <p className="text-[13px] font-medium text-pen/50">
+          <span className="num font-bold text-pen/80">{winners.length}</span> handles. Each one gets
+          the amount below.
         </p>
       </div>
 
@@ -434,7 +474,7 @@ function CampaignPanel({ assets, onDone }: { assets: string[]; onDone: () => voi
 
       <div className="grid gap-2">
         <label className="label" htmlFor="campaign-memo">
-          Note <span className="text-ivory/35">(optional)</span>
+          Note <span className="font-medium text-pen/40">(optional)</span>
         </label>
         <input
           id="campaign-memo"
@@ -468,14 +508,14 @@ function CampaignPanel({ assets, onDone }: { assets: string[]; onDone: () => voi
               ] as const
             ).map(([label, value]) => (
               <div key={label} className="grid gap-1">
-                <span className="num text-4xl font-medium leading-none text-gold-light">{value}</span>
-                <span className="text-[11px] font-semibold uppercase tracking-wider text-ivory/40">
+                <span className="num text-4xl font-bold leading-none text-gold-ink">{value}</span>
+                <span className="text-[11px] font-bold uppercase tracking-wider text-pen/50">
                   {label}
                 </span>
               </div>
             ))}
           </div>
-          <p className="mt-4 text-sm text-ivory/55">
+          <p className="mt-4 text-sm font-medium text-pen/65">
             {result.failed.length
               ? result.failed.map((f) => `${f.handle}: ${f.error}`).join(" · ")
               : "Every winner was paid. Nobody had to claim anything."}
@@ -521,46 +561,41 @@ export function Dashboard() {
   return (
     <>
       <Header />
-      <main className="pb-24 pt-10">
-        <Shell>
-          <div className="flex items-center gap-4">
-            <Avatar me={me} size={52} />
-            <div className="leading-tight">
-              <p className="eyebrow">Private wallet</p>
-              <h1 className="mt-1 font-display text-3xl font-bold tracking-tight sm:text-4xl">
-                {me.handle}
-              </h1>
+      <main className="pb-24 pt-8">
+        <Shell wide>
+          <div className="flex flex-col gap-6 lg:flex-row lg:justify-center lg:gap-7 lg:pt-3">
+            {/* The floating rail: one square per thing you can do. */}
+            <nav
+              aria-label="Wallet sections"
+              className="flex gap-3 lg:sticky lg:top-24 lg:h-fit lg:flex-col"
+            >
+              {TABS.map((t) => (
+                <NavLink
+                  key={t.id}
+                  to={`/dashboard/${t.id}`}
+                  title={t.label}
+                  aria-label={t.label}
+                  className={({ isActive }) => `rail-sq ${isActive ? "rail-on" : ""}`}
+                >
+                  {t.icon}
+                </NavLink>
+              ))}
+            </nav>
+
+            <div className="w-full min-w-0 max-w-2xl">
+              <HeroCard me={me} balances={balances} />
+              <TokenGrid assets={me.assets} balances={balances} reserve={reserve} />
+
+              {/* Keyed by tab so each switch gets the same soft entrance. */}
+              <div className="mt-6 animate-rise" key={tab}>
+                {tab === "activity" && <ActivityFeed entries={entries} />}
+                {tab === "send" && (
+                  <SendPanel assets={me.assets} presetTo={presetTo} onDone={refresh} />
+                )}
+                {tab === "campaign" && <CampaignPanel assets={me.assets} onDone={refresh} />}
+              </div>
             </div>
-            <PayLink handle={me.handle} />
           </div>
-
-          <Balances assets={me.assets} balances={balances} reserve={reserve} />
-
-          <nav className="seg mt-9" role="tablist">
-            {TABS.map((t) => (
-              <NavLink
-                key={t.id}
-                to={`/dashboard/${t.id}`}
-                role="tab"
-                className={({ isActive }) => `seg-item ${isActive ? "seg-on" : ""}`}
-              >
-                {t.label}
-              </NavLink>
-            ))}
-          </nav>
-
-          {/* Keyed by tab so each switch gets the same soft entrance. */}
-          <div className="mt-5 animate-rise" key={tab}>
-            {tab === "activity" && <ActivityFeed entries={entries} />}
-            {tab === "send" && <SendPanel assets={me.assets} presetTo={presetTo} onDone={refresh} />}
-            {tab === "campaign" && <CampaignPanel assets={me.assets} onDone={refresh} />}
-          </div>
-
-          {tab === "activity" && entries.length > 0 && (
-            <p className="mt-4 flex items-center gap-2 text-[13px] text-ivory/40">
-              <Sparkles size={14} /> Tap any payment to see its receipt.
-            </p>
-          )}
         </Shell>
       </main>
     </>

@@ -7,11 +7,19 @@ export default {
         ink: "#08070c",
         panel: "#0e0c14",
         ivory: "#f4f1ea",
+        card: "#f8f4ea",
+        pen: "#131a21",
         muted: "#a8a294",
+        sea: {
+          light: "#0d2233",
+          DEFAULT: "#081826",
+          deep: "#040d16",
+        },
         gold: {
           light: "#f6dfa4",
           DEFAULT: "#d9a85c",
           deep: "#c9964b",
+          ink: "#8f6526",
         },
       },
       fontFamily: {

@@ -1,6 +1,7 @@
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { AuthProvider } from "./contexts/AuthContext";
 import { ToastProvider } from "./contexts/ToastContext";
+import { Scene } from "./components/Scene";
 import { Home } from "./pages/Home";
 import { Dashboard } from "./pages/Dashboard";
 import { Account } from "./pages/Account";
@@ -10,6 +11,7 @@ export default function App() {
   return (
     <AuthProvider>
       <ToastProvider>
+        <Scene />
         <BrowserRouter>
         <Routes>
           <Route path="/" element={<Home />} />

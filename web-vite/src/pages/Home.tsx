@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useRef, useState, type SubmitEvent } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowRight, AtSign, EyeOff, Lock, Send, Zap } from "lucide-react";
 import { Footer, Header, Shell, Spinner } from "../components/Layout";
@@ -53,9 +53,9 @@ const ASSET_TILES = [
 ];
 
 /**
- * The hero object: a glass wallet card that tilts toward the cursor. The
- * balances sit frosted until you hover, which is the product thesis rendered
- * literally: the value is there, and only leaning in reveals it.
+ * The hero object: an ivory wallet card floating in the water, tilting toward
+ * the cursor. The balances sit frosted until you hover, which is the product
+ * thesis rendered literally: the value is there, and only leaning in reveals it.
  */
 function WalletCard() {
   const card = useRef<HTMLDivElement>(null);
@@ -81,42 +81,42 @@ function WalletCard() {
   return (
     <div className="tilt-wrap relative mx-auto w-full max-w-sm" onMouseMove={onMove} onMouseLeave={onLeave}>
       <span className="orb -right-10 -top-12 h-64 w-64 bg-gold/25" style={{ animation: "drift 7s ease-in-out infinite" }} />
-      <span className="orb -bottom-16 -left-12 h-56 w-56 bg-[#8a7aff]/15" style={{ animation: "drift 9s ease-in-out infinite reverse" }} />
+      <span className="orb -bottom-16 -left-12 h-56 w-56 bg-[#7ebed4]/15" style={{ animation: "drift 9s ease-in-out infinite reverse" }} />
 
-      <div ref={card} className="tilt-card glass-strong p-6 sm:p-7">
+      <div ref={card} className="tilt-card chunk p-6 sm:p-7">
         <span className="card-shine" />
 
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <span className="grid h-10 w-10 place-items-center rounded-full border border-white/10 bg-gradient-to-br from-white/10 to-white/[0.02] text-gold-light">
+            <span className="grid h-10 w-10 place-items-center rounded-full border-2 border-pen bg-card-bright text-gold-ink">
               <AtSign size={17} />
             </span>
             <div>
-              <p className="font-display text-[1.05rem] font-semibold leading-tight">@yourhandle</p>
-              <p className="text-xs text-ivory/45">Private wallet · Canton</p>
+              <p className="font-display text-[1.05rem] font-bold leading-tight">@yourhandle</p>
+              <p className="text-xs font-medium text-pen/50">Private wallet · Canton</p>
             </div>
           </div>
-          <span className="grid h-8 w-8 place-items-center rounded-full border border-gold/30 bg-gold/10 text-gold-light">
+          <span className="grid h-8 w-8 place-items-center rounded-full border-2 border-pen bg-[#f7ecd2] text-gold-ink">
             <Lock size={13} />
           </span>
         </div>
 
-        <div className="glow-line my-5" />
+        <div className="rule my-5" />
 
         <ul>
           {CARD_ROWS.map((row) => (
-            <li key={row.asset} className="flex items-center gap-3 border-b border-white/[0.05] py-3 last:border-0">
+            <li key={row.asset} className="flex items-center gap-3 border-b-2 border-pen/10 py-3 last:border-0">
               <TokenIcon asset={row.asset} size={34} />
               <div className="leading-tight">
-                <p className="text-sm font-semibold">{row.sym}</p>
-                <p className="text-xs text-ivory/40">{row.name}</p>
+                <p className="text-sm font-bold">{row.sym}</p>
+                <p className="text-xs font-medium text-pen/45">{row.name}</p>
               </div>
-              <span className="veil num ml-auto text-[1.05rem] font-medium">{row.amount}</span>
+              <span className="veil num ml-auto text-[1.05rem] font-bold">{row.amount}</span>
             </li>
           ))}
         </ul>
 
-        <p className="mt-4 flex items-center gap-1.5 text-xs text-ivory/40">
+        <p className="mt-4 flex items-center gap-1.5 text-xs font-medium text-pen/50">
           <Lock size={11} /> Only @yourhandle can see these. Hover to peek.
         </p>
       </div>
@@ -129,7 +129,7 @@ function PayAHandle() {
   const [value, setValue] = useState("");
   const navigate = useNavigate();
 
-  function go(e: React.FormEvent) {
+  function go(e: SubmitEvent) {
     e.preventDefault();
     const handle = value.replace(/^@+/, "").trim();
     if (handle) navigate(`/account/${handle}`);
@@ -138,7 +138,7 @@ function PayAHandle() {
   return (
     <form onSubmit={go} className="mx-auto mt-9 flex w-full max-w-sm items-center gap-2.5">
       <div className="relative flex flex-1 items-center">
-        <span className="pointer-events-none absolute left-4 text-ivory/35">@</span>
+        <span className="pointer-events-none absolute left-4 font-semibold text-pen/40">@</span>
         <input
           className="field pl-9"
           value={value}
@@ -184,8 +184,8 @@ export function Home() {
         <Shell wide>
           <div className="grid items-center gap-14 pb-16 pt-14 sm:pt-20 lg:grid-cols-2 lg:gap-10">
             <div className="animate-rise">
-              <span className="inline-flex items-center gap-2 rounded-full border border-gold/30 bg-gold/[0.08] px-3.5 py-1.5 text-xs font-semibold text-gold-light">
-                <span className="pulse-dot h-1.5 w-1.5 rounded-full bg-gold-light" />
+              <span className="chunk inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 text-xs font-bold">
+                <span className="pulse-dot h-1.5 w-1.5 rounded-full bg-gold-deep" />
                 Live on Canton devnet
               </span>
 
@@ -195,7 +195,7 @@ export function Home() {
                 <span className="text-gold-grad">Not an address.</span>
               </h1>
 
-              <p className="mt-6 max-w-md text-[1.05rem] leading-relaxed text-ivory/60">
+              <p className="mt-6 max-w-md text-[1.05rem] leading-relaxed text-ivory/70">
                 Selkie turns any X handle into a private wallet on Canton. Send CC, USDCx, cBTC or
                 cETH to @anyone. If they have never used Selkie, your payment creates their wallet
                 the moment it lands.
@@ -209,13 +209,13 @@ export function Home() {
               </div>
 
               {loginUnavailable && !me && (
-                <p className="mt-5 max-w-md rounded-xl border border-amber-300/25 bg-amber-300/[0.07] px-4 py-3 text-[13px] leading-relaxed text-amber-100/90">
+                <p className="chunk mt-5 max-w-md px-4 py-3 text-[13px] font-medium leading-relaxed text-pen/80">
                   X sign-in is coded and ready but this deployment is missing its X API keys. Set
                   X_CLIENT_ID and X_CLIENT_SECRET on the server to switch it on.
                 </p>
               )}
 
-              <p className="mt-7 text-[13px] text-ivory/40">
+              <p className="mt-7 text-[13px] font-medium text-ivory/55">
                 No app · No seed phrase · No gas · No public balances
               </p>
             </div>
@@ -227,7 +227,7 @@ export function Home() {
         </Shell>
 
         {/* ---- live-feel marquee ---- */}
-        <div className="marquee py-3">
+        <div className="marquee">
           {[0, 1].map((copy) => (
             <div className="marquee-track" key={copy} aria-hidden={copy === 1}>
               {MARQUEE.map((item, i) => (
@@ -250,18 +250,18 @@ export function Home() {
               </h2>
             </Reveal>
 
-            <div className="mt-10 grid gap-5 md:grid-cols-3">
+            <div className="mt-10 grid gap-6 md:grid-cols-3">
               {STEPS.map((step, i) => (
                 <Reveal key={step.n} delay={i * 130}>
-                  <div className="glass h-full overflow-hidden p-7">
-                    <span className="pointer-events-none absolute right-5 top-1 select-none font-display text-[4.5rem] font-bold text-white/[0.045]">
+                  <div className="chunk h-full overflow-hidden p-7">
+                    <span className="pointer-events-none absolute right-5 top-1 select-none font-display text-[4.5rem] font-bold text-pen/[0.07]">
                       {step.n}
                     </span>
-                    <span className="grid h-11 w-11 place-items-center rounded-2xl border border-gold/25 bg-gold/[0.12] text-gold-light">
+                    <span className="grid h-11 w-11 place-items-center rounded-xl border-2 border-pen bg-[#f7ecd2] text-gold-ink">
                       {step.icon}
                     </span>
-                    <h3 className="mt-5 font-display text-lg font-semibold">{step.title}</h3>
-                    <p className="mt-2 text-sm leading-relaxed text-ivory/55">{step.body}</p>
+                    <h3 className="mt-5 font-display text-lg font-bold">{step.title}</h3>
+                    <p className="mt-2 text-sm font-medium leading-relaxed text-pen/60">{step.body}</p>
                   </div>
                 </Reveal>
               ))}
@@ -275,18 +275,18 @@ export function Home() {
               <h2 className="mt-2 font-display text-3xl font-bold tracking-tight sm:text-4xl">
                 Send what you want.
               </h2>
-              <p className="mt-3 max-w-lg text-ivory/55">
+              <p className="mt-3 max-w-lg text-ivory/65">
                 One handle holds them all, and every balance stays between you and whoever you pay.
               </p>
             </Reveal>
 
-            <div className="mt-10 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="mt-10 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
               {ASSET_TILES.map((t, i) => (
                 <Reveal key={t.asset} delay={i * 90}>
-                  <div className="glass h-full p-5 transition duration-300 hover:-translate-y-1 hover:border-white/20">
+                  <div className="chunk chunk-pop h-full p-5">
                     <TokenIcon asset={t.asset} size={44} />
-                    <p className="mt-4 font-display text-lg font-semibold">{t.name}</p>
-                    <p className="mt-1 text-[13px] leading-relaxed text-ivory/45">{t.note}</p>
+                    <p className="mt-4 font-display text-lg font-bold">{t.name}</p>
+                    <p className="mt-1 text-[13px] font-medium leading-relaxed text-pen/55">{t.note}</p>
                   </div>
                 </Reveal>
               ))}
@@ -296,12 +296,11 @@ export function Home() {
           {/* ---- closing CTA ---- */}
           <section className="pt-24">
             <Reveal>
-              <div className="glass-strong overflow-hidden p-10 text-center sm:p-14">
-                <span className="orb -bottom-56 left-1/2 h-[28rem] w-[28rem] -translate-x-1/2 bg-gold/20" />
+              <div className="chunk-gold overflow-hidden p-10 text-center sm:p-14">
                 <h2 className="font-display text-[clamp(1.9rem,4.5vw,2.9rem)] font-bold tracking-tight text-balance">
                   Your handle is already a wallet.
                 </h2>
-                <p className="mx-auto mt-3 max-w-md text-ivory/55">
+                <p className="mx-auto mt-3 max-w-md font-medium text-pen/70">
                   Claim it in one tap, or pay someone who has not claimed theirs yet.
                 </p>
                 <div className="mt-8 flex justify-center">{cta}</div>

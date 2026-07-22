@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ArrowLeft, Lock } from "lucide-react";
+import { ArrowDownLeft, ArrowLeft, ArrowUpRight, Clock, Lock, ShieldCheck, StickyNote, User } from "lucide-react";
 import { Header, Shell, Spinner } from "../components/Layout";
 import { TokenIcon } from "../components/TokenIcon";
 import { api, ApiError, type Activity } from "../lib/api";
@@ -35,81 +35,82 @@ export function TransactionDetail() {
 
   if (loading) return <Spinner />;
 
+  const inbound = tx?.direction === "in";
+
   return (
     <>
       <Header />
       <main className="pb-24 pt-8">
         <Shell>
-          <Link
-            to="/dashboard/activity"
-            className="inline-flex items-center gap-2 text-sm text-ivory/50 transition hover:text-ivory"
-          >
-            <ArrowLeft size={15} /> Back to activity
+          <Link to="/dashboard/activity" className="btn btn-dim btn-sm">
+            <ArrowLeft size={15} /> Back
           </Link>
 
           {denied || !tx ? (
-            <div className="glass-strong mx-auto mt-8 max-w-md p-8 text-center sm:p-10">
-              <span className="mx-auto grid h-12 w-12 place-items-center rounded-full border border-white/10 bg-white/[0.04] text-ivory/40">
+            <div className="chunk mx-auto mt-8 max-w-md p-8 text-center sm:p-10">
+              <span className="mx-auto grid h-12 w-12 place-items-center rounded-xl border-2 border-pen bg-card-bright text-pen/50">
                 <Lock size={19} />
               </span>
-              <p className="mt-4 font-display text-xl font-semibold">
+              <p className="mt-4 font-display text-xl font-bold">
                 This payment isn't yours to see.
               </p>
-              <p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-ivory/50">
+              <p className="mx-auto mt-2 max-w-sm text-sm font-medium leading-relaxed text-pen/60">
                 On Canton a payment is visible only to the people in it. If you were part of this
                 one, sign in with that handle.
               </p>
             </div>
           ) : (
-            <div className="glass-strong mt-8 animate-rise overflow-hidden p-7 sm:p-9">
-              <span className="orb -right-24 -top-24 h-64 w-64 bg-gold/15" />
+            <div className="chunk mx-auto mt-8 max-w-lg animate-rise p-7 text-center sm:p-9">
+              {/* The verdict first: which way the money went, and how much. */}
+              <span
+                className={`mx-auto grid h-16 w-16 place-items-center rounded-full border-2 border-pen ${
+                  inbound ? "bg-[#e5f2d3] text-[#2f6d33]" : "bg-card-bright text-pen"
+                }`}
+              >
+                {inbound ? <ArrowDownLeft size={26} /> : <ArrowUpRight size={26} />}
+              </span>
 
-              <div className="flex items-center gap-4">
-                <TokenIcon asset={tx.asset} size={46} />
-                <div className="leading-tight">
-                  <p className="eyebrow">{tx.direction === "in" ? "You received" : "You sent"}</p>
-                  <p className="mt-1.5 flex items-baseline gap-2.5">
-                    <span className="num text-[clamp(2.2rem,8vw,3.1rem)] font-medium tracking-tight">
-                      {tx.direction === "in" ? "+" : "−"}
-                      {money(tx.amount)}
-                    </span>
-                    <span className="num text-base font-semibold text-ivory/60">
-                      {ASSET_LABEL[tx.asset] ?? tx.asset}
-                    </span>
-                  </p>
-                </div>
-              </div>
+              <p className="eyebrow mt-5">{inbound ? "You received" : "You sent"}</p>
+              <p className="mt-2 flex items-center justify-center gap-3">
+                <span className="num text-[clamp(2.6rem,9vw,3.6rem)] font-bold leading-none tracking-tight">
+                  {inbound ? "+" : "−"}
+                  {money(tx.amount)}
+                </span>
+                <TokenIcon asset={tx.asset} size={38} />
+              </p>
+              <p className="num mt-2 text-sm font-bold text-pen/55">
+                {ASSET_LABEL[tx.asset] ?? tx.asset}
+              </p>
 
-              <div className="glow-line my-7" />
-
-              <dl className="grid gap-0 text-sm">
+              <dl className="mt-8 grid gap-0 rounded-xl border-2 border-pen bg-card-bright px-5 text-left text-sm">
                 {[
-                  ["From", tx.from],
-                  ["To", tx.to],
-                  ["Note", tx.memo || "none"],
-                  ["When", new Date(tx.ts).toLocaleString()],
-                  ["Settled on", "Canton"],
-                ].map(([label, value]) => (
+                  [<User size={14} key="i" />, "From", tx.from],
+                  [<User size={14} key="i" />, "To", tx.to],
+                  [<StickyNote size={14} key="i" />, "Note", tx.memo || "none"],
+                  [<Clock size={14} key="i" />, "When", new Date(tx.ts).toLocaleString()],
+                  [<ShieldCheck size={14} key="i" />, "Settled on", "Canton"],
+                ].map(([icon, label, value]) => (
                   <div
-                    key={label}
-                    className="flex items-baseline justify-between gap-4 border-b border-white/[0.05] py-3.5 last:border-0"
+                    key={String(label)}
+                    className="flex items-baseline justify-between gap-4 border-b-2 border-pen/10 py-3.5 last:border-0"
                   >
-                    <dt className="label">{label}</dt>
-                    <dd className="text-right text-ivory/80">{value}</dd>
+                    <dt className="flex items-center gap-2 self-center font-bold uppercase tracking-wider text-pen/55 text-[11px]">
+                      {icon} {label}
+                    </dt>
+                    <dd className="text-right font-semibold text-pen/85">{value}</dd>
                   </div>
                 ))}
               </dl>
 
               {tx.onboarded && tx.direction === "out" && (
-                <p className="mt-6 rounded-2xl border border-gold/30 bg-gold/[0.07] p-5 text-sm leading-relaxed text-ivory/75">
+                <p className="mt-6 rounded-xl border-2 border-pen bg-[#f7ecd2] p-5 text-left text-sm font-medium leading-relaxed text-pen/80">
                   {tx.to} had no wallet before this. Selkie created one as the payment settled, so
                   there was nothing for them to claim.
                 </p>
               )}
 
-              <p className="mt-6 flex items-center gap-2 text-[13px] text-ivory/40">
-                <Lock size={13} /> Only you and {tx.direction === "in" ? tx.from : tx.to} can open
-                this page.
+              <p className="mt-6 flex items-center justify-center gap-2 text-[13px] font-medium text-pen/50">
+                <Lock size={13} /> Only you and {inbound ? tx.from : tx.to} can open this page.
               </p>
             </div>
           )}

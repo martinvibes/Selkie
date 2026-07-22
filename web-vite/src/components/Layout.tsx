@@ -1,6 +1,6 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { LogOut } from "lucide-react";
+import { ChevronDown, Home, LogOut, Wallet } from "lucide-react";
 import { Link } from "react-router-dom";
 import { LoaderMark, Mark, Wordmark, XLogo } from "./Mark";
 import { useAuth } from "../contexts/useAuth";
@@ -19,13 +19,13 @@ export function Avatar({ me, size = 32 }: { me: Me; size?: number }) {
       src={me.avatar}
       alt=""
       referrerPolicy="no-referrer"
-      className="rounded-full object-cover ring-1 ring-white/15"
+      className="rounded-full border-2 border-pen object-cover"
       style={{ width: size, height: size }}
     />
   ) : (
     <span
-      className="grid place-items-center rounded-full bg-gradient-to-br from-gold-light to-gold-deep font-display font-bold text-ink"
-      style={{ width: size, height: size, fontSize: Math.round(size * 0.44) }}
+      className="grid place-items-center rounded-full border-2 border-pen bg-gradient-to-br from-gold-light to-gold-deep font-display font-bold text-pen"
+      style={{ width: size, height: size, fontSize: Math.round(size * 0.42) }}
       aria-hidden="true"
     >
       {initial}
@@ -41,8 +41,7 @@ function SignOutModal({ handle, onClose }: { handle: string; onClose: () => void
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
-  // Portaled to <body>: the header's backdrop-blur makes it the containing
-  // block for fixed descendants, which would clip the overlay to the header.
+  // Portaled to <body>: the header's stacking context would clip the overlay.
   return createPortal(
     <div className="overlay" onClick={onClose}>
       <div
@@ -56,7 +55,7 @@ function SignOutModal({ handle, onClose }: { handle: string; onClose: () => void
           <LogOut size={20} strokeWidth={2.2} />
         </span>
         <p className="mt-5 font-display text-2xl font-bold tracking-tight">Sign out of {handle}?</p>
-        <p className="mt-2 text-[15px] leading-relaxed text-ivory/60">
+        <p className="mt-2 text-[15px] leading-relaxed text-pen/65">
           Your wallet stays safe on Canton. Signing back in with X brings it right back.
         </p>
         <div className="mt-7 flex gap-3">
@@ -73,28 +72,81 @@ function SignOutModal({ handle, onClose }: { handle: string; onClose: () => void
   );
 }
 
-export function Header() {
-  const { me } = useAuth();
+/** The handle pill: who you are, and the way out. */
+function AccountPill({ me }: { me: Me }) {
+  const [open, setOpen] = useState(false);
   const [confirmOut, setConfirmOut] = useState(false);
+  const wrap = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => {
+      if (wrap.current && !wrap.current.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    window.addEventListener("mousedown", onDown);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("mousedown", onDown);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
 
   return (
-    <header className="sticky top-0 z-40 border-b border-white/[0.06] bg-ink/70 backdrop-blur-xl">
+    <div ref={wrap} className="relative">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        aria-haspopup="menu"
+        className="chunk chunk-pop flex items-center gap-2.5 py-1.5 pl-2 pr-3.5"
+      >
+        <Avatar me={me} size={30} />
+        <span className="font-display text-sm font-bold">{me.handle}</span>
+        <ChevronDown size={15} className={`transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+
+      {open && (
+        <div className="menu" role="menu">
+          <p className="px-3 pb-1.5 pt-2 text-[11px] font-bold uppercase tracking-[0.14em] text-pen/45">
+            Signed in as {me.handle}
+          </p>
+          <Link to="/dashboard/activity" onClick={() => setOpen(false)} className="menu-item" role="menuitem">
+            <Wallet size={16} /> Your wallet
+          </Link>
+          <Link to="/" onClick={() => setOpen(false)} className="menu-item" role="menuitem">
+            <Home size={16} /> Home
+          </Link>
+          <div className="mx-2 my-1.5 rule" />
+          <button
+            onClick={() => {
+              setOpen(false);
+              setConfirmOut(true);
+            }}
+            className="menu-item text-[#a11d34]"
+            role="menuitem"
+          >
+            <LogOut size={16} /> Sign out
+          </button>
+        </div>
+      )}
+
+      {confirmOut && <SignOutModal handle={me.handle} onClose={() => setConfirmOut(false)} />}
+    </div>
+  );
+}
+
+export function Header() {
+  const { me } = useAuth();
+
+  return (
+    <header className="sticky top-0 z-40 pt-4">
       <Shell wide>
-        <div className="flex h-16 items-center justify-between gap-4">
-          <Wordmark />
+        <div className="flex items-center justify-between gap-4">
+          <div className="chunk chunk-pop px-4 py-2">
+            <Wordmark tone="pen" />
+          </div>
           {me ? (
-            <div className="flex items-center gap-3">
-              <Link
-                to="/dashboard/activity"
-                className="flex items-center gap-2.5 rounded-full border border-white/10 bg-white/[0.04] py-1.5 pl-1.5 pr-4 transition hover:border-white/25 hover:bg-white/[0.08]"
-              >
-                <Avatar me={me} size={26} />
-                <span className="text-sm font-medium text-ivory/80">{me.handle}</span>
-              </Link>
-              <button onClick={() => setConfirmOut(true)} className="btn btn-dim btn-sm">
-                Sign out
-              </button>
-            </div>
+            <AccountPill me={me} />
           ) : (
             <a href="/auth/x/login" className="btn btn-dim btn-sm">
               <XLogo size={13} /> Continue with X
@@ -102,19 +154,18 @@ export function Header() {
           )}
         </div>
       </Shell>
-      {confirmOut && me && <SignOutModal handle={me.handle} onClose={() => setConfirmOut(false)} />}
     </header>
   );
 }
 
 export function Footer() {
   return (
-    <footer className="mt-28 border-t border-white/[0.06] py-10">
+    <footer className="mt-28 pb-10">
       <Shell wide>
-        <div className="flex flex-col items-center justify-between gap-4 text-sm text-ivory/40 sm:flex-row">
+        <div className="flex flex-col items-center justify-between gap-4 text-sm text-ivory/55 sm:flex-row">
           <span className="flex items-center gap-2.5">
             <Mark size={18} />
-            <span className="font-display font-semibold text-ivory/70">Selkie</span>
+            <span className="font-display font-bold text-ivory/85">Selkie</span>
           </span>
           <span>Private payments on Canton · HackCanton S2</span>
         </div>

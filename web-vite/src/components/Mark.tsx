@@ -19,11 +19,17 @@ export function Mark({ size = 26 }: { size?: number }) {
   );
 }
 
-export function Wordmark({ to = "/" }: { to?: string }) {
+export function Wordmark({ to = "/", tone = "ivory" }: { to?: string; tone?: "ivory" | "pen" }) {
   return (
     <Link to={to} className="flex items-center gap-2.5" aria-label="Selkie home">
       <Mark size={24} />
-      <span className="font-display text-[1.05rem] font-semibold tracking-tight">Selkie</span>
+      <span
+        className={`font-display text-[1.05rem] font-bold tracking-tight ${
+          tone === "pen" ? "text-pen" : "text-ivory"
+        }`}
+      >
+        Selkie
+      </span>
     </Link>
   );
 }
