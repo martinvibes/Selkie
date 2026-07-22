@@ -160,9 +160,8 @@ export function Header() {
     >
       <Shell wide>
         <div className="flex items-center justify-between gap-4">
-          <div className="chunk chunk-pop px-4 py-2">
-            <Wordmark tone="pen" />
-          </div>
+          {/* No pill: the mark sits straight on the water. */}
+          <Wordmark />
           {me ? (
             <AccountPill me={me} />
           ) : (

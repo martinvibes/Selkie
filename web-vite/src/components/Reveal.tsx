@@ -7,10 +7,13 @@ import { useEffect, useRef, type ReactNode } from "react";
 export function Reveal({
   children,
   delay = 0,
+  variant,
   className = "",
 }: {
   children: ReactNode;
   delay?: number;
+  /** Entrance direction: from the left, the right, or surfacing from below. */
+  variant?: "left" | "right" | "pop";
   className?: string;
 }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -34,7 +37,7 @@ export function Reveal({
   return (
     <div
       ref={ref}
-      className={`reveal ${className}`}
+      className={`reveal ${variant ? `reveal-${variant}` : ""} ${className}`}
       style={{ "--reveal-delay": `${delay}ms` } as React.CSSProperties}
     >
       {children}

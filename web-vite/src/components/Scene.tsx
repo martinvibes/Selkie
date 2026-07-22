@@ -49,79 +49,89 @@ function Fish() {
 }
 
 export function Scene() {
+  // Three depth bands so the landing's scroll driver can drift each at its
+  // own rate (see "the descent" in index.css). The parallax transform lives
+  // on the band, so the members' own animations keep running untouched.
   return (
     <div className="sea-layer" aria-hidden="true">
-      {/* moonlight shafts */}
-      <span className="ray" style={{ left: "30%", width: "6rem", animationDelay: "0s" }} />
-      <span className="ray" style={{ left: "46%", width: "9rem", animationDelay: "-4s", opacity: 0.8 }} />
-      <span className="ray" style={{ left: "63%", width: "5rem", animationDelay: "-7s", opacity: 0.6 }} />
+      {/* far water: the moonlight, first to recede as you sink */}
+      <div className="layer-far">
+        <span className="ray" style={{ left: "30%", width: "6rem", animationDelay: "0s" }} />
+        <span className="ray" style={{ left: "46%", width: "9rem", animationDelay: "-4s", opacity: 0.8 }} />
+        <span className="ray" style={{ left: "63%", width: "5rem", animationDelay: "-7s", opacity: 0.6 }} />
+      </div>
 
-      {/* the sea floor: rocks and coral in silhouette */}
-      <svg className="floor" viewBox="0 0 1440 130" preserveAspectRatio="none" height="130">
-        <path
-          d="M0 130 L0 84 C 90 66 150 92 240 80 C 340 66 400 96 500 88 C 590 82 660 58 760 74 C 860 90 930 70 1030 82 C 1130 94 1200 64 1300 78 C 1370 88 1410 80 1440 86 L1440 130 Z"
-          fill="#03121b"
-        />
-        <path
-          d="M180 130 C 186 108 206 108 212 130 Z M640 130 C 648 100 672 100 680 130 Z M1080 130 C 1087 106 1105 106 1112 130 Z"
-          fill="#0a2833"
-        />
-      </svg>
+      {/* mid water: the lives drifting through it */}
+      <div className="layer-mid">
+        {BUBBLES.map((b, i) => (
+          <span
+            key={i}
+            className="bubble"
+            style={{
+              left: b.left,
+              width: b.size,
+              height: b.size,
+              animationDuration: `${b.dur}s`,
+              animationDelay: `${b.delay}s`,
+            }}
+          />
+        ))}
 
-      {/* kelp forests framing the edges */}
-      <span className="kelp" style={{ left: "-2rem", animationDelay: "-2s" }}>
-        <Kelp />
-      </span>
-      <span className="kelp hidden sm:block" style={{ left: "8rem", animationDelay: "-6s", opacity: 0.6 }}>
-        <Kelp flip />
-      </span>
-      <span className="kelp" style={{ right: "-2.5rem", animationDelay: "-4s" }}>
-        <Kelp flip />
-      </span>
-      <span className="kelp hidden md:block" style={{ right: "9rem", animationDelay: "0s", opacity: 0.55 }}>
-        <Kelp />
-      </span>
+        <svg
+          className="school"
+          style={{ top: "38%", width: 120, animationDuration: "75s", animationDelay: "-30s" }}
+          viewBox="0 0 120 60"
+        >
+          <g transform="translate(0 4) scale(0.9)"><Fish /></g>
+          <g transform="translate(34 18) scale(0.7)"><Fish /></g>
+          <g transform="translate(66 6) scale(0.8)"><Fish /></g>
+          <g transform="translate(88 26) scale(0.6)"><Fish /></g>
+          <g transform="translate(20 40) scale(0.65)"><Fish /></g>
+        </svg>
 
-      {/* bubbles rising past the cards */}
-      {BUBBLES.map((b, i) => (
-        <span
-          key={i}
-          className="bubble"
-          style={{
-            left: b.left,
-            width: b.size,
-            height: b.size,
-            animationDuration: `${b.dur}s`,
-            animationDelay: `${b.delay}s`,
-          }}
-        />
-      ))}
+        {/* and, once in a long while, the selkie herself */}
+        <svg
+          className="seal"
+          style={{ top: "22%", width: 150, animationDuration: "150s", animationDelay: "-45s" }}
+          viewBox="0 0 150 60"
+        >
+          <path
+            d="M8 34 C 2 28 6 20 16 22 L 26 25 C 44 12 78 8 104 18 C 120 24 132 22 142 14 C 146 22 140 32 128 35 C 134 40 142 40 148 38 C 144 48 130 50 118 44 C 96 54 60 54 38 44 C 28 48 16 46 10 40 Z"
+            fill="#cfe4ea"
+          />
+          <circle cx="118" cy="22" r="1.6" fill="#04121c" />
+        </svg>
+      </div>
 
-      {/* a school of fish crossing the mid-water */}
-      <svg
-        className="school"
-        style={{ top: "38%", width: 120, animationDuration: "75s", animationDelay: "-30s" }}
-        viewBox="0 0 120 60"
-      >
-        <g transform="translate(0 4) scale(0.9)"><Fish /></g>
-        <g transform="translate(34 18) scale(0.7)"><Fish /></g>
-        <g transform="translate(66 6) scale(0.8)"><Fish /></g>
-        <g transform="translate(88 26) scale(0.6)"><Fish /></g>
-        <g transform="translate(20 40) scale(0.65)"><Fish /></g>
-      </svg>
+      {/* near water: the floor and kelp, rising to meet you */}
+      <div className="layer-near">
+        <svg className="floor" viewBox="0 0 1440 130" preserveAspectRatio="none" height="130">
+          <path
+            d="M0 130 L0 84 C 90 66 150 92 240 80 C 340 66 400 96 500 88 C 590 82 660 58 760 74 C 860 90 930 70 1030 82 C 1130 94 1200 64 1300 78 C 1370 88 1410 80 1440 86 L1440 130 Z"
+            fill="#03121b"
+          />
+          <path
+            d="M180 130 C 186 108 206 108 212 130 Z M640 130 C 648 100 672 100 680 130 Z M1080 130 C 1087 106 1105 106 1112 130 Z"
+            fill="#0a2833"
+          />
+        </svg>
 
-      {/* and, once in a long while, the selkie herself */}
-      <svg
-        className="seal"
-        style={{ top: "22%", width: 150, animationDuration: "150s", animationDelay: "-45s" }}
-        viewBox="0 0 150 60"
-      >
-        <path
-          d="M8 34 C 2 28 6 20 16 22 L 26 25 C 44 12 78 8 104 18 C 120 24 132 22 142 14 C 146 22 140 32 128 35 C 134 40 142 40 148 38 C 144 48 130 50 118 44 C 96 54 60 54 38 44 C 28 48 16 46 10 40 Z"
-          fill="#cfe4ea"
-        />
-        <circle cx="118" cy="22" r="1.6" fill="#04121c" />
-      </svg>
+        <span className="kelp" style={{ left: "-2rem", animationDelay: "-2s" }}>
+          <Kelp />
+        </span>
+        <span className="kelp hidden sm:block" style={{ left: "8rem", animationDelay: "-6s", opacity: 0.6 }}>
+          <Kelp flip />
+        </span>
+        <span className="kelp" style={{ right: "-2.5rem", animationDelay: "-4s" }}>
+          <Kelp flip />
+        </span>
+        <span className="kelp hidden md:block" style={{ right: "9rem", animationDelay: "0s", opacity: 0.55 }}>
+          <Kelp />
+        </span>
+      </div>
+
+      {/* the water darkening with depth */}
+      <div className="depth-veil" />
     </div>
   );
 }

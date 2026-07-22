@@ -1,4 +1,4 @@
-import { useRef, useState, type SubmitEvent } from "react";
+import { useEffect, useRef, useState, type SubmitEvent } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowRight, AtSign, EyeOff, Lock, Send, Zap } from "lucide-react";
 import { Footer, Header, Shell, Spinner } from "../components/Layout";
@@ -124,6 +124,58 @@ function WalletCard() {
   );
 }
 
+/**
+ * The descent driver. While the landing is mounted it writes two unitless
+ * vars on <html> every frame: --sy (scrollY) and --depthp (0..1 progress),
+ * and the CSS does the rest: the moonlight recedes, the floor approaches,
+ * the water darkens, the hero drifts away. It also renders the depth gauge,
+ * whose meter reading it updates directly (no re-renders at scroll speed).
+ * Skipped entirely under prefers-reduced-motion; vars are removed on
+ * unmount so every other page stays still.
+ */
+function DepthMeter() {
+  const read = useRef<HTMLSpanElement>(null);
+
+  useEffect(() => {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const root = document.documentElement;
+    let raf = 0;
+    const frame = () => {
+      raf = 0;
+      const max = Math.max(1, root.scrollHeight - window.innerHeight);
+      const sy = window.scrollY;
+      const p = Math.min(1, sy / max);
+      root.style.setProperty("--sy", String(sy));
+      root.style.setProperty("--depthp", p.toFixed(4));
+      if (read.current) read.current.textContent = String(Math.round(p * 40));
+    };
+    const onScroll = () => {
+      if (!raf) raf = requestAnimationFrame(frame);
+    };
+    frame();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onScroll, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", onScroll);
+      if (raf) cancelAnimationFrame(raf);
+      root.style.removeProperty("--sy");
+      root.style.removeProperty("--depthp");
+    };
+  }, []);
+
+  return (
+    <div className="depth-meter" aria-hidden="true">
+      <span className="depth-track">
+        <span className="depth-fill" />
+      </span>
+      <span className="depth-read">
+        <span ref={read}>0</span> m
+      </span>
+    </div>
+  );
+}
+
 /** One input on the whole landing: open any handle's pay page. */
 function PayAHandle() {
   const [value, setValue] = useState("");
@@ -178,50 +230,58 @@ export function Home() {
   return (
     <>
       <Header />
+      <DepthMeter />
 
       <main>
         {/* ---- hero ---- */}
         <Shell wide>
           <div className="grid items-center gap-14 pb-16 pt-14 sm:pt-20 lg:grid-cols-2 lg:gap-10">
-            <div className="animate-rise">
-              <span className="chunk inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 text-xs font-bold">
-                <span className="pulse-dot h-1.5 w-1.5 rounded-full bg-gold-deep" />
-                Live on Canton devnet
-              </span>
+            {/* Parallax wrappers, entrance animation inside: `animate-rise`
+                fills its transform forever, so the scroll drift that follows
+                it needs an element of its own. */}
+            <div className="par-a par-fade">
+              <div className="animate-rise">
+                <span className="chunk inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 text-xs font-bold">
+                  <span className="pulse-dot h-1.5 w-1.5 rounded-full bg-gold-deep" />
+                  Live on Canton devnet
+                </span>
 
-              <h1 className="mt-6 font-display text-[clamp(2.9rem,6.5vw,4.6rem)] font-bold leading-[1.02] tracking-[-0.03em] text-balance">
-                Pay a handle.
-                <br />
-                <span className="text-gold-grad">Not an address.</span>
-              </h1>
+                <h1 className="mt-6 font-display text-[clamp(2.9rem,6.5vw,4.6rem)] font-bold leading-[1.02] tracking-[-0.03em] text-balance">
+                  Pay a handle.
+                  <br />
+                  <span className="text-gold-grad">Not an address.</span>
+                </h1>
 
-              <p className="mt-6 max-w-md text-[1.05rem] leading-relaxed text-ivory/70">
-                Selkie turns any X handle into a private wallet on Canton. Send CC, USDCx, cBTC or
-                cETH to @anyone. If they have never used Selkie, your payment creates their wallet
-                the moment it lands.
-              </p>
-
-              <div className="mt-9 flex flex-wrap items-center gap-3.5">
-                {cta}
-                <a href="#how" className="btn btn-dim">
-                  How it works
-                </a>
-              </div>
-
-              {loginUnavailable && !me && (
-                <p className="chunk mt-5 max-w-md px-4 py-3 text-[13px] font-medium leading-relaxed text-pen/80">
-                  X sign-in is coded and ready but this deployment is missing its X API keys. Set
-                  X_CLIENT_ID and X_CLIENT_SECRET on the server to switch it on.
+                <p className="mt-6 max-w-md text-[1.05rem] leading-relaxed text-ivory/70">
+                  Selkie turns any X handle into a private wallet on Canton. Send CC, USDCx, cBTC
+                  or cETH to @anyone. If they have never used Selkie, your payment creates their
+                  wallet the moment it lands.
                 </p>
-              )}
 
-              <p className="mt-7 text-[13px] font-medium text-ivory/55">
-                No app · No seed phrase · No gas · No public balances
-              </p>
+                <div className="mt-9 flex flex-wrap items-center gap-3.5">
+                  {cta}
+                  <a href="#how" className="btn btn-dim">
+                    How it works
+                  </a>
+                </div>
+
+                {loginUnavailable && !me && (
+                  <p className="chunk mt-5 max-w-md px-4 py-3 text-[13px] font-medium leading-relaxed text-pen/80">
+                    X sign-in is coded and ready but this deployment is missing its X API keys. Set
+                    X_CLIENT_ID and X_CLIENT_SECRET on the server to switch it on.
+                  </p>
+                )}
+
+                <p className="mt-7 text-[13px] font-medium text-ivory/55">
+                  No app · No seed phrase · No gas · No public balances
+                </p>
+              </div>
             </div>
 
-            <div className="animate-rise [animation-delay:150ms]">
-              <WalletCard />
+            <div className="par-b par-fade">
+              <div className="animate-rise [animation-delay:150ms]">
+                <WalletCard />
+              </div>
             </div>
           </div>
         </Shell>
@@ -250,9 +310,15 @@ export function Home() {
               </h2>
             </Reveal>
 
+            {/* The three steps converge: outer cards sail in from their own
+                side, the middle one surfaces between them. */}
             <div className="mt-10 grid gap-6 md:grid-cols-3">
               {STEPS.map((step, i) => (
-                <Reveal key={step.n} delay={i * 130}>
+                <Reveal
+                  key={step.n}
+                  delay={i * 130}
+                  variant={i === 0 ? "left" : i === 1 ? "pop" : "right"}
+                >
                   <div className="chunk h-full overflow-hidden p-7">
                     <span className="pointer-events-none absolute right-5 top-1 select-none font-display text-[4.5rem] font-bold text-pen/[0.07]">
                       {step.n}
@@ -282,7 +348,7 @@ export function Home() {
 
             <div className="mt-10 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
               {ASSET_TILES.map((t, i) => (
-                <Reveal key={t.asset} delay={i * 90}>
+                <Reveal key={t.asset} delay={i * 90} variant="pop">
                   <div className="chunk chunk-pop h-full p-5">
                     <TokenIcon asset={t.asset} size={44} />
                     <p className="mt-4 font-display text-lg font-bold">{t.name}</p>
@@ -295,7 +361,7 @@ export function Home() {
 
           {/* ---- closing CTA ---- */}
           <section className="pt-24">
-            <Reveal>
+            <Reveal variant="pop">
               <div className="chunk-gold overflow-hidden p-10 text-center sm:p-14">
                 <h2 className="font-display text-[clamp(1.9rem,4.5vw,2.9rem)] font-bold tracking-tight text-balance">
                   Your handle is already a wallet.

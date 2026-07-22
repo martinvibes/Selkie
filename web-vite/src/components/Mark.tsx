@@ -21,7 +21,13 @@ export function Mark({ size = 26 }: { size?: number }) {
 
 export function Wordmark({ to = "/", tone = "ivory" }: { to?: string; tone?: "ivory" | "pen" }) {
   return (
-    <Link to={to} className="flex items-center gap-2.5" aria-label="Selkie home">
+    <Link
+      to={to}
+      // Unbacked on the scene, so it carries its own shadow to stay legible
+      // over moonlit water.
+      className="flex items-center gap-2.5 transition-opacity hover:opacity-80 [filter:drop-shadow(0_2px_10px_rgba(2,7,13,0.75))]"
+      aria-label="Selkie home"
+    >
       <Mark size={24} />
       <span
         className={`font-display text-[1.05rem] font-bold tracking-tight ${

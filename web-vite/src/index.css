@@ -775,6 +775,106 @@
   transform: none;
   filter: none;
 }
+/* Directional variants: cards sail in from a side or surface from below.
+   .reveal.is-in outranks these, so they only shape the entrance. */
+.reveal-left {
+  transform: translate3d(-46px, 24px, 0) rotate(-1.5deg);
+}
+.reveal-right {
+  transform: translate3d(46px, 24px, 0) rotate(1.5deg);
+}
+.reveal-pop {
+  transform: translate3d(0, 44px, 0) scale(0.92);
+}
+
+/* ---------- the descent (landing scroll story) ----------
+   Home mounts a driver that writes two unitless vars on <html> each frame:
+   --sy (scrollY in px) and --depthp (0..1 progress through the page).
+   Everything below is pure CSS off those vars, and everything holds still
+   on pages that don't run the driver. */
+
+.layer-far,
+.layer-mid,
+.layer-near {
+  position: absolute;
+  inset: 0;
+}
+/* Far water (moonlight) recedes upward as you sink; the near floor rises
+   to meet you. Different rates make the water read as deep, not flat. */
+.layer-far {
+  transform: translate3d(0, calc(var(--sy, 0) * -0.16px), 0);
+}
+.layer-mid {
+  transform: translate3d(0, calc(var(--sy, 0) * -0.07px), 0);
+}
+/* Bottom-anchored scale, not translate: the floor can approach without
+   ever un-anchoring from the bottom edge. */
+.layer-near {
+  transform-origin: 50% 100%;
+  transform: scale(calc(1 + var(--depthp, 0) * 0.07));
+}
+/* The water itself darkens with depth. */
+.depth-veil {
+  position: absolute;
+  inset: 0;
+  background: #010509;
+  opacity: calc(var(--depthp, 0) * 0.52);
+}
+
+/* Hero drift: the two hero columns surface away at different speeds. */
+.par-a {
+  transform: translate3d(0, calc(var(--sy, 0) * -0.12px), 0);
+}
+.par-b {
+  transform: translate3d(0, calc(var(--sy, 0) * -0.05px), 0);
+}
+.par-fade {
+  opacity: clamp(0, calc(1 - var(--sy, 0) / 950), 1);
+}
+
+/* The depth gauge: a hairline on the right that fills gold as you sink,
+   with a live meter reading. Fades in once scrolling starts. */
+.depth-meter {
+  position: fixed;
+  right: 1.3rem;
+  top: 50%;
+  z-index: 30;
+  transform: translateY(-50%);
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.65rem;
+  opacity: clamp(0, calc(var(--sy, 0) / 320), 1);
+  pointer-events: none;
+}
+@media (min-width: 1024px) {
+  .depth-meter {
+    display: flex;
+  }
+}
+.depth-track {
+  width: 3px;
+  height: 10rem;
+  border-radius: 999px;
+  background: rgba(244, 241, 234, 0.13);
+  overflow: hidden;
+}
+.depth-fill {
+  display: block;
+  width: 100%;
+  height: 100%;
+  transform-origin: top;
+  transform: scaleY(var(--depthp, 0));
+  background: linear-gradient(180deg, var(--gold-1), var(--gold-3));
+}
+.depth-read {
+  font-family: "Space Grotesk", "Inter", sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: rgba(244, 241, 234, 0.62);
+  font-variant-numeric: tabular-nums;
+}
 
 @keyframes fade-in {
   from {
@@ -856,5 +956,9 @@
   .school,
   .seal {
     display: none;
+  }
+  /* The scroll driver never mounts under reduced motion; hide its gauge too. */
+  .depth-meter {
+    display: none !important;
   }
 }
