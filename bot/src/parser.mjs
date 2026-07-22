@@ -20,6 +20,23 @@ const RULES = [
     map: (m) => ({ amount: m[1], asset: m[2], from: m[3], memo: m[4] ?? "" }),
   },
   {
+    // "requests" (plural) lists them. It cannot collide with the rule above,
+    // which needs whitespace straight after "request".
+    type: "requests",
+    re: /\brequests\b/i,
+    map: () => ({}),
+  },
+  {
+    type: "approve",
+    re: new RegExp(`\\bapprove\\b(?:\\s+${HANDLE})?`, "i"),
+    map: (m) => ({ from: m[1] ?? null }),
+  },
+  {
+    type: "decline",
+    re: new RegExp(`\\bdecline\\b(?:\\s+${HANDLE})?`, "i"),
+    map: (m) => ({ from: m[1] ?? null }),
+  },
+  {
     type: "escrow",
     re: new RegExp(`\\bescrow\\s+${AMOUNT}\\s+${ASSET}\\s+with\\s+${HANDLE}\\s+for\\s+"([^"]+)"`, "i"),
     map: (m) => ({ amount: m[1], asset: m[2], with: m[3], terms: m[4] }),

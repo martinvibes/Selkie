@@ -163,6 +163,72 @@ describe("web API", { skip: reachable ? false : "no JSON API on " + JSON_API }, 
     assert.equal((await (await api("/api/balance")).json()).balances.CC, 100);
   });
 
+  test("a request settles over the API only when the payer approves", async () => {
+    const mira = name("mira");
+    const theo = name("theo");
+    await wallet.deposit(theo, "CC", 40);
+    const miraApi = await signIn(mira);
+    const theoApi = await signIn(theo);
+
+    const asked = await (
+      await miraApi("/api/request", {
+        method: "POST",
+        body: JSON.stringify({ from: theo, asset: "CC", amount: 15, memo: "tickets" }),
+      })
+    ).json();
+    assert.equal(asked.amount, 15);
+
+    // Asking moves nothing.
+    assert.equal((await (await theoApi("/api/balance")).json()).balances.CC, 40);
+
+    // Each side sees it from their own end.
+    const theoSees = await (await theoApi("/api/requests")).json();
+    assert.equal(theoSees.incoming.length, 1);
+    assert.equal(theoSees.incoming[0].from, `@${mira}`);
+    assert.equal((await (await miraApi("/api/requests")).json()).outgoing.length, 1);
+
+    const paid = await (
+      await theoApi("/api/requests/answer", {
+        method: "POST",
+        body: JSON.stringify({ cid: asked.cid, action: "approve" }),
+      })
+    ).json();
+    assert.equal(paid.amount, 15);
+    assert.equal((await (await theoApi("/api/balance")).json()).balances.CC, 25);
+    assert.equal((await (await miraApi("/api/balance")).json()).balances.CC, 15);
+
+    // And it lands in the payer's payment history, because it was a payment.
+    const hist = await (await theoApi("/api/history")).json();
+    assert.equal(hist.entries[0].to, `@${mira}`);
+    assert.equal(hist.entries[0].amount, 15);
+  });
+
+  test("a stranger cannot approve someone else's request", async () => {
+    const mira = name("mira9");
+    const theo = name("theo9");
+    const nosy = name("nosy9");
+    await wallet.deposit(theo, "CC", 10);
+    await wallet.deposit(nosy, "CC", 10);
+
+    const asked = await (
+      await (
+        await signIn(mira)
+      )("/api/request", {
+        method: "POST",
+        body: JSON.stringify({ from: theo, asset: "CC", amount: 5 }),
+      })
+    ).json();
+
+    const nosyApi = await signIn(nosy);
+    const res = await nosyApi("/api/requests/answer", {
+      method: "POST",
+      body: JSON.stringify({ cid: asked.cid, action: "approve" }),
+    });
+
+    assert.equal(res.status, 403, "refused, and refused as a permission problem");
+    assert.equal((await (await nosyApi("/api/balance")).json()).balances.CC, 10, "not debited");
+  });
+
   test("static serving cannot be walked out of the web root", async () => {
     const res = await fetch(`${base}/../../../etc/passwd`);
     assert.notEqual(res.status, 200);

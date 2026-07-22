@@ -37,6 +37,7 @@ export class Wallet {
     this.directoryTid = ledger.tid("Account", "AccountDirectory");
     this.holdingTid = ledger.tid("Holding", "Holding");
     this.transferTid = ledger.tid("Transfer", "TransferInstruction");
+    this.requestTid = ledger.tid("Request", "PaymentRequest");
   }
 
   /**
@@ -96,6 +97,17 @@ export class Wallet {
     const acc = await this.ledger.queryOne(
       [this.accountTid],
       { operator: this.operator, handle: norm },
+      [this.operator],
+    );
+    if (!acc) return null;
+    return { cid: acc.contractId, owner: acc.payload.owner, handle: acc.payload.handle };
+  }
+
+  /** Fetch an account by its party, for contracts that name parties not handles. */
+  async accountByParty(party) {
+    const acc = await this.ledger.queryOne(
+      [this.accountTid],
+      { operator: this.operator, owner: party },
       [this.operator],
     );
     if (!acc) return null;
@@ -267,6 +279,158 @@ export class Wallet {
       memo,
       onboarded: recipient.created,
     };
+  }
+
+  /**
+   * "request 10 USDCX from @chidi" — ask someone to pay you.
+   *
+   * A request moves no money on its own. It is a contract the payer can
+   * approve, and approving settles the transfer atomically inside the same
+   * choice, so there is no window where the request is accepted but the money
+   * has not moved. Both wallets are created up front: you can ask someone who
+   * has never used Selkie, and their wallet is waiting when they answer.
+   */
+  async requestPayment({ from, to, asset, amount, memo = "", platform = "x" }) {
+    const value = Number(amount);
+    if (!ASSETS.includes(asset)) throw new Error(`unknown asset: ${asset}`);
+    if (!(value > 0)) throw new Error("amount must be positive");
+
+    const requester = await this.ensureAccount(from, platform);
+    const payer = await this.ensureAccount(to, platform);
+    if (payer.owner === requester.owner) throw new Error("cannot request from yourself");
+
+    const req = await this.ledger.create(
+      this.requestTid,
+      {
+        operator: this.operator,
+        requester: requester.owner,
+        payer: payer.owner,
+        asset,
+        amount: String(value),
+        memo,
+      },
+      [this.operator, requester.owner],
+    );
+
+    return {
+      cid: req.contractId,
+      from: requester.handle,
+      to: payer.handle,
+      asset,
+      amount: value,
+      memo,
+      onboarded: payer.created,
+    };
+  }
+
+  /**
+   * Open requests for a handle, split by which side of them you are on.
+   * `incoming` is money someone wants from you, `outgoing` is money you asked
+   * for. The ledger only shows each party their own, which is the point.
+   */
+  async requests(handle) {
+    const acc = await this.findAccount(handle);
+    if (!acc) return { incoming: [], outgoing: [] };
+
+    const rows = await this.ledger.query([this.requestTid], {}, [this.operator]);
+    const mine = { incoming: [], outgoing: [] };
+    // Parties are what the contract stores; handles are what people read.
+    const handles = new Map();
+    const handleOf = async (party) => {
+      if (!handles.has(party)) handles.set(party, (await this.accountByParty(party))?.handle ?? party);
+      return handles.get(party);
+    };
+
+    for (const c of rows) {
+      const side =
+        c.payload.payer === acc.owner ? "incoming" : c.payload.requester === acc.owner ? "outgoing" : null;
+      if (!side) continue;
+      mine[side].push({
+        cid: c.contractId,
+        asset: c.payload.asset,
+        amount: Number(c.payload.amount),
+        memo: c.payload.memo ?? "",
+        from: await handleOf(c.payload.requester),
+        to: await handleOf(c.payload.payer),
+      });
+    }
+    return mine;
+  }
+
+  /** Find one open request by contract id, or throw a caller-friendly error. */
+  async #findRequest(cid) {
+    const rows = await this.ledger.query([this.requestTid], {}, [this.operator]);
+    const found = rows.find((c) => c.contractId === cid);
+    if (!found) {
+      const err = new Error("that request is no longer open");
+      err.code = "NO_SUCH_REQUEST";
+      throw err;
+    }
+    return found;
+  }
+
+  /**
+   * Pay a request. The payer must be the party the request names, so an
+   * approval from anyone else is refused before it reaches the ledger.
+   */
+  async approveRequest({ cid, payerHandle }) {
+    const req = await this.#findRequest(cid);
+    const payer = await this.findAccount(payerHandle);
+    if (!payer || payer.owner !== req.payload.payer) {
+      const err = new Error("that request is not addressed to you");
+      err.code = "NOT_YOUR_REQUEST";
+      throw err;
+    }
+
+    const requester = await this.accountByParty(req.payload.requester);
+    if (!requester) throw new Error("the requester's wallet has gone missing");
+
+    const asset = req.payload.asset;
+    const amount = Number(req.payload.amount);
+    const holdingCid = await this.fundingHolding(payerHandle, asset, amount);
+
+    await this.ledger.exercise(
+      this.requestTid,
+      cid,
+      "Approve",
+      {
+        payerAccCid: payer.cid,
+        requesterAccCid: requester.cid,
+        holdingCid,
+      },
+      [this.operator, payer.owner],
+    );
+
+    return { from: payer.handle, to: requester.handle, asset, amount, memo: req.payload.memo ?? "" };
+  }
+
+  /** Turn a request down. Only the payer can. */
+  async declineRequest({ cid, payerHandle }) {
+    const req = await this.#findRequest(cid);
+    const payer = await this.findAccount(payerHandle);
+    if (!payer || payer.owner !== req.payload.payer) {
+      const err = new Error("that request is not addressed to you");
+      err.code = "NOT_YOUR_REQUEST";
+      throw err;
+    }
+    await this.ledger.exercise(this.requestTid, cid, "Decline", {}, [this.operator, payer.owner]);
+    return { asset: req.payload.asset, amount: Number(req.payload.amount) };
+  }
+
+  /** Take back a request you sent. Only the requester can. */
+  async cancelRequest({ cid, requesterHandle }) {
+    const req = await this.#findRequest(cid);
+    const requester = await this.findAccount(requesterHandle);
+    if (!requester || requester.owner !== req.payload.requester) {
+      const err = new Error("that is not your request to cancel");
+      err.code = "NOT_YOUR_REQUEST";
+      throw err;
+    }
+    await this.ledger.exercise(this.requestTid, cid, "CancelRequest", {}, [
+      this.operator,
+      requester.owner,
+    ]);
+    return { asset: req.payload.asset, amount: Number(req.payload.amount) };
   }
 
   /**

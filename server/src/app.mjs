@@ -285,6 +285,78 @@ export function createApp({ wallet, config, history, cbtc = null }) {
           }
         }
 
+        if (pathname === "/api/requests" && req.method === "GET") {
+          return send(res, 200, await wallet.requests(session.handle));
+        }
+
+        if (pathname === "/api/request" && req.method === "POST") {
+          const body = await readBody(req);
+          const from = String(body.from ?? "").trim();
+          const asset = String(body.asset ?? "").toUpperCase();
+          const amount = Number(body.amount);
+          if (!from) return send(res, 400, { error: "who are you asking?" });
+          if (!ASSETS.includes(asset)) return send(res, 400, { error: `unknown asset: ${asset}` });
+          if (!(amount > 0)) return send(res, 400, { error: "amount must be positive" });
+
+          try {
+            const result = await wallet.requestPayment({
+              from: session.handle,
+              to: from,
+              asset,
+              amount,
+              memo: String(body.memo ?? "").slice(0, 140),
+              platform: "x",
+            });
+            // A request is not a payment, so it does not go in the payment
+            // history. It shows up as an open request until it is answered.
+            return send(res, 200, result);
+          } catch (err) {
+            return send(res, 500, { error: err.message, code: err.code ?? null });
+          }
+        }
+
+        // Answering a request: approve settles it, decline closes it, and
+        // cancel takes back one you sent. The wallet checks that the caller is
+        // the party the contract names, so a stolen contract id gets nowhere.
+        if (pathname === "/api/requests/answer" && req.method === "POST") {
+          const body = await readBody(req);
+          const cid = String(body.cid ?? "").trim();
+          const action = String(body.action ?? "").toLowerCase();
+          if (!cid) return send(res, 400, { error: "which request?" });
+          if (!["approve", "decline", "cancel"].includes(action)) {
+            return send(res, 400, { error: `unknown action: ${action}` });
+          }
+
+          try {
+            if (action === "approve") {
+              const paid = await wallet.approveRequest({ cid, payerHandle: session.handle });
+              const logged = await history.append({
+                type: "send",
+                from: paid.from,
+                to: paid.to,
+                asset: paid.asset,
+                amount: paid.amount,
+                memo: paid.memo,
+                onboarded: false,
+              });
+              return send(res, 200, { ...paid, action, id: logged.id });
+            }
+            const result =
+              action === "decline"
+                ? await wallet.declineRequest({ cid, payerHandle: session.handle })
+                : await wallet.cancelRequest({ cid, requesterHandle: session.handle });
+            return send(res, 200, { ...result, action });
+          } catch (err) {
+            const status =
+              err.code === "NOT_YOUR_REQUEST" || err.code === "NO_SUCH_REQUEST"
+                ? 403
+                : err.code === "INSUFFICIENT_FUNDS"
+                  ? 400
+                  : 500;
+            return send(res, status, { error: err.message, code: err.code ?? null });
+          }
+        }
+
         if (pathname === "/api/campaign" && req.method === "POST") {
           const body = await readBody(req);
           const winners = Array.isArray(body.winners) ? body.winners.filter(Boolean) : [];

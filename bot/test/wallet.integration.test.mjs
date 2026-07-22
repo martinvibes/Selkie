@@ -111,6 +111,77 @@ describe("wallet on a live ledger", { skip: reachable ? false : "no JSON API on 
     assert.equal(second, first, "same party is reused, not re-allocated");
   });
 
+  test("a request settles only when the payer approves it", async () => {
+    const mira = h("mira");
+    const theo = h("theo");
+    await wallet.deposit(theo, "USDCX", 30);
+
+    const req = await wallet.requestPayment({
+      from: mira,
+      to: theo,
+      asset: "USDCX",
+      amount: 12,
+      memo: "lunch",
+    });
+
+    // Asking for money must not move any.
+    assert.equal((await wallet.balance(theo)).USDCX, 30, "payer untouched until they approve");
+    assert.equal((await wallet.balance(mira)).USDCX, undefined, "requester not paid yet");
+
+    // Each side sees the same request from their own end.
+    assert.equal((await wallet.requests(theo)).incoming.length, 1);
+    assert.equal((await wallet.requests(mira)).outgoing.length, 1);
+
+    const settled = await wallet.approveRequest({ cid: req.cid, payerHandle: theo });
+    assert.equal(settled.amount, 12);
+    assert.equal((await wallet.balance(theo)).USDCX, 18, "payer debited");
+    assert.equal((await wallet.balance(mira)).USDCX, 12, "requester paid");
+    assert.equal((await wallet.requests(theo)).incoming.length, 0, "request is closed");
+  });
+
+  test("only the named payer can approve a request", async () => {
+    const mira = h("mira2");
+    const theo = h("theo2");
+    const nosy = h("nosy2");
+    await wallet.deposit(theo, "CC", 10);
+    await wallet.deposit(nosy, "CC", 10);
+
+    const req = await wallet.requestPayment({ from: mira, to: theo, asset: "CC", amount: 5 });
+
+    await assert.rejects(
+      () => wallet.approveRequest({ cid: req.cid, payerHandle: nosy }),
+      /not addressed to you/i,
+      "a stranger cannot pay someone else's request into existence",
+    );
+    assert.equal((await wallet.balance(nosy)).CC, 10, "stranger not debited");
+  });
+
+  test("declining a request closes it without moving money", async () => {
+    const mira = h("mira3");
+    const theo = h("theo3");
+    await wallet.deposit(theo, "CC", 8);
+
+    const req = await wallet.requestPayment({ from: mira, to: theo, asset: "CC", amount: 3 });
+    await wallet.declineRequest({ cid: req.cid, payerHandle: theo });
+
+    assert.equal((await wallet.balance(theo)).CC, 8, "nothing moved");
+    assert.equal((await wallet.requests(theo)).incoming.length, 0, "request is gone");
+    await assert.rejects(
+      () => wallet.approveRequest({ cid: req.cid, payerHandle: theo }),
+      /no longer open/i,
+    );
+  });
+
+  test("you can request from someone who has never used Selkie", async () => {
+    const mira = h("mira4");
+    const stranger = h("stranger4");
+    assert.equal(await wallet.findAccount(stranger), null);
+
+    const req = await wallet.requestPayment({ from: mira, to: stranger, asset: "CC", amount: 4 });
+    assert.equal(req.onboarded, true, "their wallet was created by the ask");
+    assert.equal((await wallet.requests(stranger)).incoming.length, 1);
+  });
+
   test("reward campaign pays 20 winners, all previously walletless", async () => {
     const dara = h("dara");
     await wallet.deposit(dara, "CC", 100);

@@ -325,6 +325,7 @@
 
   /* ---------- the floating rail (dashboard nav) ---------- */
   .rail-sq {
+    position: relative;
     display: grid;
     place-items: center;
     width: 3.4rem;
@@ -353,6 +354,27 @@
       inset 0 1px 0 rgba(255, 255, 255, 0.5),
       0.22rem 0.28rem 0 var(--shadow),
       0 10px 26px -10px rgba(217, 168, 92, 0.55);
+  }
+
+  /* How many people are waiting on you, readable without opening the tab. */
+  .rail-badge {
+    position: absolute;
+    top: -0.42rem;
+    right: -0.42rem;
+    min-width: 1.35rem;
+    height: 1.35rem;
+    padding: 0 0.3rem;
+    display: grid;
+    place-items: center;
+    border-radius: 999px;
+    border: 2px solid var(--pen);
+    background: #e8613f;
+    color: #fff6ec;
+    font-family: "Space Grotesk", "Inter", sans-serif;
+    font-size: 11px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
   }
 
   /* ---------- the 3D tilt card ---------- */

@@ -9,7 +9,8 @@ const HELP = [
   "",
   "send 5 USDCX to @bayo",
   "request 10 CC from @ada",
-  "reward top 3 replies with 1 CBTC",
+  "requests            see who is waiting on you",
+  "approve @ada        pay what they asked for",
   "balance",
   "",
   "Assets: CC, USDCX, CBTC, CETH. No app, no seed phrase, no gas.",
@@ -67,7 +68,61 @@ export async function handleCommand({ wallet, from, text, platform = "x" }) {
       }
 
       case "request": {
-        return `Payment requests are wired to the ledger but need ${normalizeHandle(cmd.from)} to approve from their side. Landing next.`;
+        const res = await wallet.requestPayment({
+          from,
+          to: cmd.from,
+          asset: cmd.asset,
+          amount: cmd.amount,
+          memo: cmd.memo,
+          platform,
+        });
+        const head = `Asked ${res.to} for ${fmt(res.amount)} ${res.asset}.`;
+        return res.onboarded
+          ? `${head}\n${res.to} had no wallet, so Selkie made them one. They can pay you by replying "approve".`
+          : `${head}\nThey pay you by replying "approve". Nothing moves until they do.`;
+      }
+
+      case "requests": {
+        const { incoming, outgoing } = await wallet.requests(from);
+        if (!incoming.length && !outgoing.length) return "No open requests.";
+        const lines = [];
+        if (incoming.length) {
+          lines.push("People waiting on you:");
+          for (const r of incoming) {
+            lines.push(`  ${r.from} asked for ${fmt(r.amount)} ${r.asset}${r.memo ? ` for ${r.memo}` : ""}`);
+          }
+          lines.push("", 'Reply "approve @handle" to pay, or "decline @handle".');
+        }
+        if (outgoing.length) {
+          if (lines.length) lines.push("");
+          lines.push("You are waiting on:");
+          for (const r of outgoing) {
+            lines.push(`  ${r.to} for ${fmt(r.amount)} ${r.asset}`);
+          }
+        }
+        return lines.join("\n");
+      }
+
+      case "approve":
+      case "decline": {
+        const { incoming } = await wallet.requests(from);
+        if (!incoming.length) return "You have no open requests to answer.";
+
+        const wanted = cmd.from ? normalizeHandle(cmd.from) : null;
+        const matches = wanted ? incoming.filter((r) => r.from === wanted) : incoming;
+        if (!matches.length) return `No open request from ${wanted}.`;
+        if (matches.length > 1) {
+          const who = matches.map((r) => r.from).join(", ");
+          return `You have more than one open request (${who}). Say "${cmd.type} @handle" to pick one.`;
+        }
+
+        const target = matches[0];
+        if (cmd.type === "decline") {
+          await wallet.declineRequest({ cid: target.cid, payerHandle: from });
+          return `Declined ${target.from}'s request for ${fmt(target.amount)} ${target.asset}. No money moved.`;
+        }
+        const paid = await wallet.approveRequest({ cid: target.cid, payerHandle: from });
+        return `Paid ${paid.to} ${fmt(paid.amount)} ${paid.asset}.\nSettled on Canton. Nobody else can see the amount.`;
       }
 
       case "escrow":

@@ -7,6 +7,7 @@ import {
   ArrowUpRight,
   Check,
   CheckCircle2,
+  HandCoins,
   Inbox,
   Link2,
   Lock,
@@ -17,12 +18,22 @@ import { Avatar, Header, Shell, Spinner } from "../components/Layout";
 import { TokenIcon } from "../components/TokenIcon";
 import { useAuth } from "../contexts/useAuth";
 import { useToast } from "../contexts/ToastContext";
-import { api, type Activity, type CampaignResult, type Me, type Reserve, type SendResult } from "../lib/api";
+import {
+  api,
+  type Activity,
+  type CampaignResult,
+  type Me,
+  type PaymentRequest,
+  type Requests,
+  type Reserve,
+  type SendResult,
+} from "../lib/api";
 import { ASSET_LABEL, money, parseHandles, timeAgo } from "../lib/format";
 
 const TABS = [
   { id: "activity", label: "Activity", icon: <ActivityIcon size={19} /> },
   { id: "send", label: "Send", icon: <Send size={18} /> },
+  { id: "requests", label: "Requests", icon: <HandCoins size={19} /> },
   { id: "campaign", label: "Pay many", icon: <Sparkles size={18} /> },
 ] as const;
 
@@ -396,6 +407,238 @@ function SendPanel({
   );
 }
 
+/** One open ask, with the buttons that end it. */
+function RequestRow({
+  req,
+  side,
+  onAnswer,
+}: {
+  req: PaymentRequest;
+  side: "incoming" | "outgoing";
+  onAnswer: (cid: string, action: "approve" | "decline" | "cancel") => Promise<void>;
+}) {
+  const [busy, setBusy] = useState<string | null>(null);
+
+  async function answer(action: "approve" | "decline" | "cancel") {
+    setBusy(action);
+    try {
+      await onAnswer(req.cid, action);
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  return (
+    <li className="rounded-xl border-2 border-pen bg-card-bright p-4">
+      <div className="flex items-center gap-3">
+        <TokenIcon asset={req.asset} size={32} />
+        <div className="min-w-0 flex-1 leading-snug">
+          <p className="flex items-baseline gap-2">
+            <span className="num text-[15px] font-bold">{money(req.amount)}</span>
+            <span className="text-[13px] font-semibold text-pen/50">
+              {ASSET_LABEL[req.asset] ?? req.asset}
+            </span>
+          </p>
+          <p className="truncate text-[13px] font-medium text-pen/55">
+            {side === "incoming" ? `${req.from} asked you` : `you asked ${req.to}`}
+            {req.memo ? ` · ${req.memo}` : ""}
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-3.5 flex flex-wrap gap-2.5">
+        {side === "incoming" ? (
+          <>
+            <button
+              className="btn btn-gold btn-sm"
+              disabled={busy !== null}
+              onClick={() => answer("approve")}
+            >
+              {busy === "approve" ? "Paying…" : "Pay"}
+            </button>
+            <button
+              className="btn btn-dim btn-sm"
+              disabled={busy !== null}
+              onClick={() => answer("decline")}
+            >
+              {busy === "decline" ? "Declining…" : "Decline"}
+            </button>
+          </>
+        ) : (
+          <button
+            className="btn btn-dim btn-sm"
+            disabled={busy !== null}
+            onClick={() => answer("cancel")}
+          >
+            {busy === "cancel" ? "Withdrawing…" : "Withdraw"}
+          </button>
+        )}
+      </div>
+    </li>
+  );
+}
+
+function RequestsPanel({
+  assets,
+  requests,
+  onDone,
+}: {
+  assets: string[];
+  requests: Requests;
+  onDone: () => void;
+}) {
+  const [from, setFrom] = useState("");
+  const [amount, setAmount] = useState("");
+  const [asset, setAsset] = useState(assets[0] ?? "CC");
+  const [memo, setMemo] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const toast = useToast();
+
+  async function submit(event: SubmitEvent) {
+    event.preventDefault();
+    setError(null);
+    const value = Number(amount);
+    if (!from.trim()) return setError("Who are you asking?");
+    if (!(value > 0)) return setError("Enter an amount greater than zero.");
+
+    setBusy(true);
+    try {
+      const res = await api.askFor({
+        from: from.replace(/^@+/, "").trim(),
+        asset,
+        amount: value,
+        memo,
+      });
+      toast("success", `Asked ${res.to} for ${money(res.amount)} ${ASSET_LABEL[res.asset] ?? res.asset}`);
+      setFrom("");
+      setAmount("");
+      setMemo("");
+      onDone();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "That didn't go through. Nothing was asked.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function answer(cid: string, action: "approve" | "decline" | "cancel") {
+    try {
+      await api.answerRequest({ cid, action });
+      toast(
+        "success",
+        action === "approve"
+          ? "Paid. Settled on Canton."
+          : action === "decline"
+            ? "Declined. No money moved."
+            : "Request withdrawn.",
+      );
+      onDone();
+    } catch (err) {
+      toast("error", err instanceof Error ? err.message : "That didn't go through.");
+    }
+  }
+
+  const { incoming, outgoing } = requests;
+
+  return (
+    <div className="grid gap-6">
+      {incoming.length > 0 && (
+        <section className="chunk p-5 sm:p-6">
+          <p className="font-display text-lg font-bold">Waiting on you</p>
+          <p className="mt-1 text-[13px] font-medium text-pen/55">
+            Nothing has moved. It only moves when you tap Pay.
+          </p>
+          <ul className="mt-4 grid gap-3">
+            {incoming.map((r) => (
+              <RequestRow key={r.cid} req={r} side="incoming" onAnswer={answer} />
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {outgoing.length > 0 && (
+        <section className="chunk p-5 sm:p-6">
+          <p className="font-display text-lg font-bold">You're waiting on</p>
+          <ul className="mt-4 grid gap-3">
+            {outgoing.map((r) => (
+              <RequestRow key={r.cid} req={r} side="outgoing" onAnswer={answer} />
+            ))}
+          </ul>
+        </section>
+      )}
+
+      <form onSubmit={submit} className="chunk grid gap-5 p-6 sm:p-7">
+        <div>
+          <p className="font-display text-lg font-bold">Ask for money</p>
+          <p className="mt-1 text-[13px] font-medium text-pen/55">
+            They get a request, not a charge. Only their approval moves anything.
+          </p>
+        </div>
+
+        <div className="grid gap-2">
+          <label className="label" htmlFor="ask-from">
+            From
+          </label>
+          <div className="relative flex items-center">
+            <span className="pointer-events-none absolute left-4 font-semibold text-pen/40">@</span>
+            <input
+              id="ask-from"
+              className="field pl-9"
+              value={from}
+              onChange={(e) => setFrom(e.target.value)}
+              placeholder="handle"
+              autoComplete="off"
+              spellCheck={false}
+            />
+          </div>
+        </div>
+
+        <div className="grid gap-2">
+          <label className="label" htmlFor="ask-amount">
+            Amount
+          </label>
+          <input
+            id="ask-amount"
+            className="field num"
+            inputMode="decimal"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            placeholder="0.00"
+            autoComplete="off"
+          />
+        </div>
+
+        <div className="grid gap-2.5">
+          <span className="label">Asset</span>
+          <AssetPicker assets={assets} value={asset} onChange={setAsset} />
+        </div>
+
+        <div className="grid gap-2">
+          <label className="label" htmlFor="ask-memo">
+            Note <span className="font-medium text-pen/40">(optional)</span>
+          </label>
+          <input
+            id="ask-memo"
+            className="field"
+            value={memo}
+            maxLength={140}
+            onChange={(e) => setMemo(e.target.value)}
+            placeholder="what's it for"
+            autoComplete="off"
+          />
+        </div>
+
+        <button className="btn btn-gold w-full" disabled={busy} type="submit">
+          {busy ? "Asking…" : "Send request"}
+        </button>
+
+        {error && <ErrorNote key={error}>{error}</ErrorNote>}
+      </form>
+    </div>
+  );
+}
+
 function CampaignPanel({ assets, onDone }: { assets: string[]; onDone: () => void }) {
   const [raw, setRaw] = useState("");
   const [amount, setAmount] = useState("");
@@ -535,18 +778,21 @@ export function Dashboard() {
   const [balances, setBalances] = useState<Record<string, number>>({});
   const [entries, setEntries] = useState<Activity[]>([]);
   const [reserve, setReserve] = useState<Reserve | null>(null);
+  const [requests, setRequests] = useState<Requests>({ incoming: [], outgoing: [] });
 
   const refresh = useCallback(async () => {
     if (!me) return;
     // The reserve is nice-to-have context; a hiccup there must not take the
     // wallet down with it.
-    const [b, h, r] = await Promise.all([
+    const [b, h, q, r] = await Promise.all([
       api.balance(),
       api.history(),
+      api.requests(),
       api.reserve().catch(() => null),
     ]);
     setBalances(b.balances);
     setEntries(h.entries);
+    setRequests(q);
     setReserve(r);
   }, [me]);
 
@@ -580,6 +826,9 @@ export function Dashboard() {
                   className={({ isActive }) => `rail-sq ${isActive ? "rail-on" : ""}`}
                 >
                   {t.icon}
+                  {t.id === "requests" && requests.incoming.length > 0 && (
+                    <span className="rail-badge">{requests.incoming.length}</span>
+                  )}
                 </NavLink>
               ))}
             </nav>
@@ -597,6 +846,9 @@ export function Dashboard() {
                   {tab === "activity" && <ActivityFeed entries={entries} />}
                   {tab === "send" && (
                     <SendPanel assets={me.assets} presetTo={presetTo} onDone={refresh} />
+                  )}
+                  {tab === "requests" && (
+                    <RequestsPanel assets={me.assets} requests={requests} onDone={refresh} />
                   )}
                   {tab === "campaign" && <CampaignPanel assets={me.assets} onDone={refresh} />}
                 </div>

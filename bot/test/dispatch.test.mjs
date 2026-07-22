@@ -50,6 +50,77 @@ describe("dispatch", () => {
     assert.match(out, /already have the money/i);
   });
 
+  test("asking for money says plainly that nothing has moved", async () => {
+    const wallet = stub({
+      requestPayment: async ({ asset, amount }) => ({
+        from: "@ada",
+        to: "@chidi",
+        asset,
+        amount: Number(amount),
+        onboarded: false,
+      }),
+    });
+    const out = await reply("request 10 CC from @chidi", wallet);
+    assert.match(out, /Asked @chidi for 10 CC/);
+    assert.match(out, /Nothing moves until they do/i);
+  });
+
+  test("lists who is waiting on you and how to answer", async () => {
+    const wallet = stub({
+      requests: async () => ({
+        incoming: [{ cid: "r1", from: "@mira", to: "@ada", asset: "CC", amount: 10, memo: "lunch" }],
+        outgoing: [],
+      }),
+    });
+    const out = await reply("requests", wallet);
+    assert.match(out, /@mira asked for 10 CC for lunch/);
+    assert.match(out, /approve @handle/);
+  });
+
+  test("approving the only open request pays it", async () => {
+    let paid = null;
+    const wallet = stub({
+      requests: async () => ({
+        incoming: [{ cid: "r1", from: "@mira", to: "@ada", asset: "CC", amount: 10, memo: "" }],
+        outgoing: [],
+      }),
+      approveRequest: async (args) => {
+        paid = args;
+        return { from: "@ada", to: "@mira", asset: "CC", amount: 10 };
+      },
+    });
+    const out = await reply("approve", wallet);
+    assert.equal(paid.cid, "r1", "approved the open request without being told which");
+    assert.match(out, /Paid @mira 10 CC/);
+  });
+
+  test("declining moves no money and says so", async () => {
+    const wallet = stub({
+      requests: async () => ({
+        incoming: [{ cid: "r1", from: "@mira", to: "@ada", asset: "CC", amount: 10, memo: "" }],
+        outgoing: [],
+      }),
+      declineRequest: async () => ({ asset: "CC", amount: 10 }),
+    });
+    assert.match(await reply("decline @mira", wallet), /No money moved/i);
+  });
+
+  test("two open requests force you to name one", async () => {
+    const wallet = stub({
+      requests: async () => ({
+        incoming: [
+          { cid: "r1", from: "@mira", to: "@ada", asset: "CC", amount: 10, memo: "" },
+          { cid: "r2", from: "@theo", to: "@ada", asset: "CC", amount: 4, memo: "" },
+        ],
+        outgoing: [],
+      }),
+      approveRequest: async () => assert.fail("must not guess which request to pay"),
+    });
+    const out = await reply("approve", wallet);
+    assert.match(out, /more than one open request/i);
+    assert.match(out, /@mira, @theo/);
+  });
+
   test("rejects unknown assets before touching the ledger", async () => {
     const wallet = stub({
       send: async () => assert.fail("should not reach the ledger"),
