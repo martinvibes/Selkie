@@ -496,13 +496,38 @@ function DepositPanel({ onDone }: { onDone: () => void }) {
   return (
     <div className="grid gap-6">
       <section className="chunk p-6 sm:p-7">
-        <p className="font-display text-lg font-bold">Fund your wallet</p>
+        <p className="font-display text-lg font-bold">
+          Fund your wallet with {ASSET_LABEL[info.instrument] ?? info.instrument}
+        </p>
         <p className="mt-2 text-sm font-medium text-pen/60">
-          Send {info.instrument} from any Canton wallet to the address below. Selkie receives for
-          every handle at this one address, so the tag is what tells it the money is yours. Put it
-          in the transfer's metadata under{" "}
+          Send {ASSET_LABEL[info.instrument] ?? info.instrument} from any Canton wallet to the
+          address below. Selkie receives for every handle at this one address, so the tag is what
+          tells it the money is yours. Put it in the transfer's metadata under{" "}
           <code className="num font-bold text-pen/80">{info.tagKey}</code>.
         </p>
+
+        {/* Canton Coin is not a token-standard holding, it is Amulet, and it
+            moves through a different template that this path does not read
+            yet. Saying so here beats a deposit that silently never arrives. */}
+        <p className="mt-3 flex items-start gap-2.5 rounded-xl border-2 border-pen bg-[#f7ecd2] px-4 py-3 text-[13px] font-semibold text-gold-ink">
+          <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+          <span>
+            {ASSET_LABEL[info.instrument] ?? info.instrument} only. Canton Coin sent from the Canton
+            Coin Wallet will not appear here: it is a different kind of contract, and Selkie cannot
+            read it yet.
+          </span>
+        </p>
+
+        {info.isOperator && (
+          <p className="mt-3 flex items-start gap-2.5 rounded-xl border-2 border-pen bg-[#fadfe3] px-4 py-3 text-[13px] font-semibold text-[#7c1d2c]">
+            <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+            <span>
+              This address is your own Canton party, because you run the deposit party. Sending to
+              it from your own wallet moves money from you to you and changes nothing. Deposits have
+              to come from somebody else's party.
+            </span>
+          </p>
+        )}
 
         <div className="mt-5 grid gap-4">
           <CopyField label={`Address on ${info.network}`} value={info.address} />
