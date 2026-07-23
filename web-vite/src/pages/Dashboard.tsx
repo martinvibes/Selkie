@@ -13,6 +13,7 @@ import {
   Inbox,
   Link2,
   Lock,
+  RefreshCw,
   Send,
   Sparkles,
 } from "lucide-react";
@@ -67,7 +68,17 @@ function PayLink({ handle }: { handle: string }) {
 }
 
 /** The gold card: who you are and what your handle holds, front and center. */
-function HeroCard({ me, balances }: { me: Me; balances: Record<string, number> }) {
+function HeroCard({
+  me,
+  balances,
+  onRefresh,
+  refreshing,
+}: {
+  me: Me;
+  balances: Record<string, number>;
+  onRefresh: () => void;
+  refreshing: boolean;
+}) {
   const cc = balances.CC ?? 0;
   return (
     <section className="chunk-gold p-6 sm:p-7">
@@ -79,9 +90,21 @@ function HeroCard({ me, balances }: { me: Me; balances: Record<string, number> }
             <h1 className="mt-0.5 font-display text-2xl font-bold tracking-tight">{me.handle}</h1>
           </div>
         </div>
-        <span className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border-2 border-pen/25 bg-white/30 px-3 py-1 text-xs font-bold">
-          <Lock size={11} /> Only you
-        </span>
+        <div className="flex shrink-0 items-center gap-2">
+          <button
+            type="button"
+            onClick={onRefresh}
+            disabled={refreshing}
+            aria-label="Refresh balances"
+            title="Refresh"
+            className="grid h-8 w-8 place-items-center rounded-full border-2 border-pen/25 bg-white/30 text-pen transition hover:bg-white/55 disabled:opacity-60"
+          >
+            <RefreshCw size={14} className={refreshing ? "animate-spin" : ""} />
+          </button>
+          <span className="flex items-center gap-1.5 whitespace-nowrap rounded-full border-2 border-pen/25 bg-white/30 px-3 py-1 text-xs font-bold">
+            <Lock size={11} /> Only you
+          </span>
+        </div>
       </div>
 
       <div className="mt-7 flex flex-wrap items-end justify-between gap-5">
@@ -477,37 +500,70 @@ function ReceiveCard({ me }: { me: Me }) {
   );
 }
 
+/** Sum claimed transfers per asset into a human line, e.g. "100 CC and 0.1 cBTC". */
+function summarizeClaim(claimed: DepositClaim["claimed"]): string {
+  const byAsset = new Map<string, number>();
+  for (const c of claimed) byAsset.set(c.asset, (byAsset.get(c.asset) ?? 0) + c.amount);
+  return [...byAsset].map(([a, n]) => `${money(n)} ${ASSET_LABEL[a] ?? a}`).join(" and ");
+}
+
 function DepositPanel({ me, onDone }: { me: Me; onDone: () => void }) {
   const [info, setInfo] = useState<Deposit | null>(null);
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<DepositClaim | null>(null);
   const toast = useToast();
 
-  useEffect(() => {
-    void api
-      .deposit()
-      .then(setInfo)
-      .catch(() => setInfo({ active: false }));
-  }, []);
+  const load = useCallback(
+    () =>
+      api
+        .deposit()
+        .then((d) => {
+          setInfo(d);
+          return d;
+        })
+        .catch(() => {
+          const off: Deposit = { active: false };
+          setInfo(off);
+          return off;
+        }),
+    [],
+  );
 
-  async function check(includeUntagged = false) {
-    setBusy(true);
-    try {
-      const res = await api.claimDeposits(includeUntagged);
-      setResult(res);
-      toast(
-        res.claimed.length ? "success" : "error",
-        res.claimed.length
-          ? `${money(res.total)} cBTC landed in your wallet.`
-          : "Nothing waiting for your handle yet.",
-      );
-      onDone();
-    } catch (err) {
-      toast("error", err instanceof Error ? err.message : "Couldn't reach the ledger.");
-    } finally {
-      setBusy(false);
-    }
-  }
+  const claim = useCallback(
+    async (includeUntagged = false, silent = false) => {
+      setBusy(true);
+      try {
+        const res = await api.claimDeposits(includeUntagged);
+        setResult(res);
+        if (res.claimed.length) {
+          toast("success", `${summarizeClaim(res.claimed)} landed in your wallet.`);
+          onDone();
+          await load();
+        } else if (!silent) {
+          toast("error", "Nothing waiting for you yet.");
+        }
+      } catch (err) {
+        if (!silent) toast("error", err instanceof Error ? err.message : "Couldn't reach the ledger.");
+      } finally {
+        setBusy(false);
+      }
+    },
+    [load, onDone, toast],
+  );
+
+  // Open the tab, read the deposit config, and quietly accept any Canton Coin
+  // already sitting at your address so a transfer just shows up.
+  useEffect(() => {
+    let alive = true;
+    void load().then((d) => {
+      if (alive && (d.cc?.pending?.length ?? 0) > 0) void claim(false, true);
+    });
+    return () => {
+      alive = false;
+    };
+    // load and claim are stable; run this once on open.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   if (!info)
     return (
@@ -517,87 +573,97 @@ function DepositPanel({ me, onDone }: { me: Me; onDone: () => void }) {
       </div>
     );
 
-  if (!info.active) {
-    return (
-      <div className="grid gap-6">
-        <ReceiveCard me={me} />
-        <section className="chunk p-6 sm:p-7">
-          <p className="font-display text-lg font-bold">cBTC funding is off on this build</p>
-          <p className="mt-2 text-sm font-medium text-pen/60">
-            Selkie pulls in cBTC on Canton devnet. This instance is running without a devnet
-            connection, so there is nowhere to receive it — but your handle and address above still
-            work for payments inside Selkie.
-          </p>
-        </section>
-      </div>
-    );
-  }
+  const ccAddress = info.cc?.address ?? me.address ?? null;
+  const ccWaiting = (info.cc?.pending ?? []).reduce((n, p) => n + p.amount, 0);
 
   return (
     <div className="grid gap-6">
       <ReceiveCard me={me} />
-      <section className="chunk p-6 sm:p-7">
-        <p className="font-display text-lg font-bold">
-          Fund your wallet with {ASSET_LABEL[info.instrument] ?? info.instrument}
-        </p>
-        <p className="mt-2 text-sm font-medium text-pen/60">
-          Send {ASSET_LABEL[info.instrument] ?? info.instrument} from any Canton wallet to the
-          address below. Selkie receives for every handle at this one address, so the tag is what
-          tells it the money is yours. Put it in the transfer's metadata under{" "}
-          <code className="num font-bold text-pen/80">{info.tagKey}</code>.
-        </p>
 
-        {/* Canton Coin is not a token-standard holding, it is Amulet, and it
-            moves through a different template that this path does not read
-            yet. Saying so here beats a deposit that silently never arrives. */}
-        <p className="mt-3 flex items-start gap-2.5 rounded-xl border-2 border-pen bg-[#f7ecd2] px-4 py-3 text-[13px] font-semibold text-gold-ink">
-          <AlertTriangle size={14} className="mt-0.5 shrink-0" />
-          <span>
-            {ASSET_LABEL[info.instrument] ?? info.instrument} only. Canton Coin sent from the Canton
-            Coin Wallet will not appear here: it is a different kind of contract, and Selkie cannot
-            read it yet.
-          </span>
-        </p>
-
-        {info.isOperator && (
-          <p className="mt-3 flex items-start gap-2.5 rounded-xl border-2 border-pen bg-[#fadfe3] px-4 py-3 text-[13px] font-semibold text-[#7c1d2c]">
-            <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+      {/* Canton Coin lands at your own party, so it is a personal address and
+          Selkie accepts it for you. This is the path most people will use. */}
+      {info.cc && ccAddress && (
+        <section className="chunk p-6 sm:p-7">
+          <p className="font-display text-lg font-bold">Fund with Canton Coin</p>
+          <p className="mt-2 text-sm font-medium text-pen/60">
+            Send CC from the Canton Coin Wallet, or any Canton wallet, to your address below. It
+            arrives at your own party and Selkie accepts it into your balance for you.
+          </p>
+          <div className="mt-5">
+            <CopyField label="Your Canton Coin address" value={ccAddress} />
+          </div>
+          {ccWaiting > 0 && (
+            <p className="mt-4 flex items-start gap-2.5 rounded-xl border-2 border-pen bg-[#eef6ec] px-4 py-3 text-[13px] font-semibold text-[#215c2f]">
+              <ArrowDownLeft size={14} className="mt-0.5 shrink-0" />
+              <span>
+                <span className="num font-bold">{money(ccWaiting)} CC</span> just arrived and is
+                being accepted into your wallet…
+              </span>
+            </p>
+          )}
+          <p className="mt-4 flex items-start gap-2.5 border-t-2 border-pen/10 pt-4 text-[13px] font-medium text-pen/55">
+            <Lock size={13} className="mt-0.5 shrink-0" />
             <span>
-              This address is your own Canton party, because you run the deposit party. Sending to
-              it from your own wallet moves money from you to you and changes nothing. Deposits have
-              to come from somebody else's party.
+              A Canton transfer waits on the ledger until it is accepted. Selkie does that for you
+              the moment you open this page, or when you tap below.
             </span>
           </p>
-        )}
+        </section>
+      )}
 
-        <div className="mt-5 grid gap-4">
-          <CopyField label={`Address on ${info.network}`} value={info.address} />
-          <CopyField label="Your tag" value={info.tag} />
-        </div>
+      {/* cBTC: a shared token-standard address, attributed by a handle tag. */}
+      {info.active && (
+        <section className="chunk p-6 sm:p-7">
+          <p className="font-display text-lg font-bold">
+            Fund with {ASSET_LABEL[info.instrument] ?? info.instrument}
+          </p>
+          <p className="mt-2 text-sm font-medium text-pen/60">
+            Send {ASSET_LABEL[info.instrument] ?? info.instrument} from any Canton wallet to the
+            address below. Selkie receives it for every handle at this one address, so the tag is
+            what tells it the money is yours. Put it in the transfer's metadata under{" "}
+            <code className="num font-bold text-pen/80">{info.tagKey}</code>.
+          </p>
 
-        <p className="mt-5 flex items-start gap-2.5 border-t-2 border-pen/10 pt-4 text-[13px] font-medium text-pen/55">
-          <Lock size={13} className="mt-0.5 shrink-0" />
-          <span>
-            A transfer waits on the ledger until it is accepted, so nothing lands until you tap
-            below. An untagged transfer is left alone rather than handed to whoever asks next.
-          </span>
-        </p>
-      </section>
+          <p className="mt-3 flex items-start gap-2.5 rounded-xl border-2 border-pen bg-[#f7ecd2] px-4 py-3 text-[13px] font-semibold text-gold-ink">
+            <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+            <span>
+              This address is for {ASSET_LABEL[info.instrument] ?? info.instrument}. To fund with
+              Canton Coin, use your own address above instead.
+            </span>
+          </p>
+
+          {info.isOperator && (
+            <p className="mt-3 flex items-start gap-2.5 rounded-xl border-2 border-pen bg-[#fadfe3] px-4 py-3 text-[13px] font-semibold text-[#7c1d2c]">
+              <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+              <span>
+                This address is your own Canton party, because you run the deposit party. Sending to
+                it from your own wallet moves money from you to you and changes nothing. Deposits
+                have to come from somebody else's party.
+              </span>
+            </p>
+          )}
+
+          <div className="mt-5 grid gap-4">
+            <CopyField label={`Address on ${info.network}`} value={info.address} />
+            <CopyField label="Your tag" value={info.tag} />
+          </div>
+        </section>
+      )}
 
       <section className="chunk p-6 sm:p-7">
         <p className="font-display text-lg font-bold">Already sent something?</p>
         <p className="mt-1 text-[13px] font-medium text-pen/55">
-          This reads the ledger for transfers tagged with your handle and accepts them.
+          This reads the ledger for transfers waiting at your address and accepts them.
         </p>
-        <button onClick={() => check()} disabled={busy} className="btn btn-gold mt-4 w-full">
+        <button onClick={() => claim()} disabled={busy} className="btn btn-gold mt-4 w-full">
           {busy ? "Checking the ledger…" : "Check for deposits"}
         </button>
 
         {/* Faucet transfers name nobody. Only the handle running the deposit
             party can take those, and only by saying so. */}
-        {info.isOperator && (
+        {info.active && info.isOperator && (
           <button
-            onClick={() => check(true)}
+            onClick={() => claim(true)}
             disabled={busy}
             className="btn btn-dim btn-sm mt-3 w-full"
           >
@@ -611,15 +677,14 @@ function DepositPanel({ me, onDone }: { me: Me; onDone: () => void }) {
               <ResultNote title="Deposit settled on Canton">
                 <p className="font-medium">
                   <span className="num font-bold text-gold-ink">
-                    {money(result.total)} {info.instrument}
+                    {summarizeClaim(result.claimed)}
                   </span>{" "}
-                  is now in your wallet, and in Selkie's on-ledger reserve.
+                  is now in your wallet.
                 </p>
               </ResultNote>
             ) : (
               <p className="text-sm font-medium text-pen/55">
-                Nothing tagged for {info.tag} is waiting. A transfer can take a moment to reach the
-                participant.
+                Nothing waiting for you yet. A transfer can take a moment to reach the participant.
               </p>
             )}
             {result.unattributed > 0 && (
@@ -1009,6 +1074,8 @@ export function Dashboard() {
   const [reserve, setReserve] = useState<Reserve | null>(null);
   const [requests, setRequests] = useState<Requests>({ incoming: [], outgoing: [] });
 
+  const [refreshing, setRefreshing] = useState(false);
+
   const refresh = useCallback(async () => {
     if (!me) return;
     // The reserve is nice-to-have context; a hiccup there must not take the
@@ -1024,6 +1091,17 @@ export function Dashboard() {
     setRequests(q);
     setReserve(r);
   }, [me]);
+
+  // The tap-to-refresh icon on the hero: same reload, with a spin so the tap
+  // is felt. Beats a full page reload, which throws the whole app away.
+  const doRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await refresh();
+    } finally {
+      setRefreshing(false);
+    }
+  }, [refresh]);
 
   useEffect(() => {
     void refresh();
@@ -1063,7 +1141,7 @@ export function Dashboard() {
             </nav>
 
             <div className="w-full min-w-0 lg:max-w-4xl">
-              <HeroCard me={me} balances={balances} />
+              <HeroCard me={me} balances={balances} onRefresh={doRefresh} refreshing={refreshing} />
 
               {/* Below the hero the wallet splits: what you hold on the left,
                   what you're doing on the right. A rail click lands its panel

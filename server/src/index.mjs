@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import { dirname, join, resolve } from "node:path";
 import { ledgerFromEnv } from "../../bot/src/ledger.mjs";
 import { cbtcFromEnv } from "../../bot/src/cbtc.mjs";
+import { amuletFromEnv } from "../../bot/src/amulet.mjs";
 import { Wallet } from "../../bot/src/wallet.mjs";
 import { History } from "./history.mjs";
 import { createApp } from "./app.mjs";
@@ -61,12 +62,16 @@ const history = new History(process.env.SELKIE_HISTORY ?? join(here, "../../.dat
 
 // Throws on a half-configured setup: better no reserve than a wrong one.
 const cbtc = cbtcFromEnv();
+// Real Canton Coin deposits: accept Amulet transfers sent to a handle's own
+// party. Shares the cBTC devnet credentials, so it lights up on the same nodes.
+const amulet = amuletFromEnv();
 
-createApp({ wallet, config, history, cbtc }).listen(config.port, () => {
+createApp({ wallet, config, history, cbtc, amulet }).listen(config.port, () => {
   console.log(`Selkie on http://localhost:${config.port}`);
   console.log(`  operator: ${operator}`);
   console.log(`  X login:  ${config.x.clientId ? "configured" : "not configured (set X_CLIENT_ID)"}`);
   console.log(`  cBTC:     ${cbtc ? `live reserve on Canton devnet (${cbtc.party.slice(0, 24)}...)` : "local asset only"}`);
+  console.log(`  CC deposit: ${amulet ? "live (accept Canton Coin at each handle's party)" : "off"}`);
   console.log(`  parties:  ${pool ? "pool (claim a pre-granted party per handle)" : "allocate per handle"}`);
   if (config.devLogin) console.log("  dev login: ENABLED at /auth/dev?handle=name");
 });

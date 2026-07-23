@@ -26,7 +26,7 @@ const MIME = {
 const SESSION = "selkie_session";
 const OAUTH = "selkie_oauth";
 
-export function createApp({ wallet, config, history, cbtc = null }) {
+export function createApp({ wallet, config, history, cbtc = null, amulet = null }) {
   // One reserve read serves everyone for 30s: the endpoint is public, and the
   // ledger should not be re-queried per pageview.
   let reserveCache = null;
@@ -313,15 +313,42 @@ export function createApp({ wallet, config, history, cbtc = null }) {
         // the handle tag is what makes a deposit yours. We say so plainly here
         // rather than dressing a shared address up as a personal one.
         if (pathname === "/api/deposit" && req.method === "GET") {
-          if (!cbtc) return send(res, 200, { active: false });
+          if (!cbtc && !amulet) return send(res, 200, { active: false });
+          // Canton Coin lands at the handle's OWN party (its real Canton
+          // address), so its deposit address is personal, not the shared cBTC
+          // one. Surface any transfers already waiting there so the UI can
+          // offer to accept them.
+          let cc = null;
+          if (amulet) {
+            const account = await wallet.findAccount(session.handle);
+            const userParty = account?.owner ?? null;
+            if (userParty) {
+              try {
+                cc = {
+                  address: userParty,
+                  pending: (await amulet.pendingFor(userParty)).map((p) => ({
+                    amount: p.amount,
+                    sender: p.sender,
+                  })),
+                };
+              } catch {
+                cc = { address: userParty, pending: [] };
+              }
+            }
+          }
           return send(res, 200, {
-            active: true,
-            address: cbtc.party,
-            network: "Canton devnet",
-            instrument: cbtc.instrument,
-            tagKey: HANDLE_KEY,
-            tag: session.handle,
-            isOperator: operatorHandle === session.handle,
+            active: Boolean(cbtc),
+            cc,
+            ...(cbtc
+              ? {
+                  address: cbtc.party,
+                  network: "Canton devnet",
+                  instrument: cbtc.instrument,
+                  tagKey: HANDLE_KEY,
+                  tag: session.handle,
+                  isOperator: operatorHandle === session.handle,
+                }
+              : {}),
           });
         }
 
@@ -329,36 +356,77 @@ export function createApp({ wallet, config, history, cbtc = null }) {
         // incoming transfer waits as an instruction until we accept it, so
         // nothing lands in a wallet without Selkie exercising a choice.
         if (pathname === "/api/deposit/claim" && req.method === "POST") {
-          if (!cbtc) return send(res, 400, { error: "deposits are not configured" });
+          if (!cbtc && !amulet) return send(res, 400, { error: "deposits are not configured" });
           try {
             const body = await readBody(req);
-            // Untagged transfers, e.g. straight from the cBTC faucet, name
-            // nobody. Only the handle that runs the deposit party may take
-            // them, and only by asking for them explicitly.
-            const sweeping =
-              Boolean(body.includeUntagged) && operatorHandle === session.handle;
-            const waiting = await cbtc.pending();
-            const mine = waiting.filter((t) =>
-              t.handle ? normalizeHandle(t.handle) === session.handle : sweeping,
-            );
-            const unattributed = sweeping ? 0 : waiting.filter((t) => !t.handle).length;
-
             const claimed = [];
-            for (const t of mine) {
-              const { updateId } = await cbtc.accept(t.cid);
-              await wallet.deposit(session.handle, cbtc.instrument, t.amount);
-              const logged = await history.append({
-                type: "deposit",
-                from: t.sender,
-                to: session.handle,
-                asset: cbtc.instrument,
-                amount: t.amount,
-                memo: "deposit from Canton",
-                onboarded: false,
-              });
-              claimed.push({ amount: t.amount, sender: t.sender, updateId, id: logged.id });
+            let unattributed = 0;
+
+            // cBTC: token-standard transfers to the shared deposit party,
+            // attributed by the handle tag. Untagged transfers, e.g. straight
+            // from the cBTC faucet, name nobody. Only the handle that runs the
+            // deposit party may take them, and only by asking explicitly.
+            if (cbtc) {
+              const sweeping =
+                Boolean(body.includeUntagged) && operatorHandle === session.handle;
+              const waiting = await cbtc.pending();
+              const mine = waiting.filter((t) =>
+                t.handle ? normalizeHandle(t.handle) === session.handle : sweeping,
+              );
+              unattributed = sweeping ? 0 : waiting.filter((t) => !t.handle).length;
+              for (const t of mine) {
+                const { updateId } = await cbtc.accept(t.cid);
+                await wallet.deposit(session.handle, cbtc.instrument, t.amount);
+                const logged = await history.append({
+                  type: "deposit",
+                  from: t.sender,
+                  to: session.handle,
+                  asset: cbtc.instrument,
+                  amount: t.amount,
+                  memo: "deposit from Canton",
+                  onboarded: false,
+                });
+                claimed.push({
+                  asset: cbtc.instrument,
+                  amount: t.amount,
+                  sender: t.sender,
+                  updateId,
+                  id: logged.id,
+                });
+              }
             }
-            // The reserve moved, so the cached copy is now a lie.
+
+            // Canton Coin: Amulet transfers sent straight to the handle's own
+            // party. No tag needed, the party itself is the address, so we
+            // accept as that party and credit the handle it belongs to.
+            if (amulet) {
+              const account = await wallet.findAccount(session.handle);
+              const userParty = account?.owner;
+              if (userParty) {
+                for (const t of await amulet.pendingFor(userParty)) {
+                  const { updateId } = await amulet.acceptFor(userParty, t.cid);
+                  await wallet.deposit(session.handle, "CC", t.amount);
+                  const logged = await history.append({
+                    type: "deposit",
+                    from: t.sender,
+                    to: session.handle,
+                    asset: "CC",
+                    amount: t.amount,
+                    memo: "deposit from Canton Coin",
+                    onboarded: false,
+                  });
+                  claimed.push({
+                    asset: "CC",
+                    amount: t.amount,
+                    sender: t.sender,
+                    updateId,
+                    id: logged.id,
+                  });
+                }
+              }
+            }
+
+            // The cBTC reserve may have moved, so the cached copy is now a lie.
             if (claimed.length) reserveCache = null;
             return send(res, 200, {
               claimed,

@@ -66,8 +66,14 @@ export type PublicAccount = {
  * handle, so `tag` is what makes a transfer yours: senders put it in the
  * transfer's metadata under `tagKey`.
  */
+/** Canton Coin arrives at your own party, so its address is personal. */
+export type CcDeposit = {
+  address: string;
+  pending: { amount: number; sender: string }[];
+};
+
 export type Deposit =
-  | { active: false }
+  | { active: false; cc?: CcDeposit | null }
   | {
       active: true;
       address: string;
@@ -77,10 +83,11 @@ export type Deposit =
       tag: string;
       /** Runs the deposit party, so may claim transfers that named no handle. */
       isOperator: boolean;
+      cc?: CcDeposit | null;
     };
 
 export type DepositClaim = {
-  claimed: { amount: number; sender: string; updateId: string; id: string }[];
+  claimed: { asset: string; amount: number; sender: string; updateId: string; id: string }[];
   total: number;
   unattributed: number;
 };
