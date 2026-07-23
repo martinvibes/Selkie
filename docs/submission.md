@@ -81,6 +81,23 @@ Ledger update ids:
 holdings straight off the ledger, caches for 30 seconds, and returns 503 if
 the ledger is unreachable rather than reporting a comfortable zero.
 
+**Proof that the whole wallet runs on real Canton, not a laptop sandbox**
+
+Selkie's own DAR is uploaded to the shared HackCanton devnet participant, and
+the organiser granted us several real parties on it. Running Selkie's wallet
+logic against that node, with no code changes, only configuration:
+
+- Two handles become two distinct Canton parties and open real accounts on
+  the shared node.
+- One is credited, then pays the other. The payment settles on devnet.
+- A third party hosted on the very same ledger is then shown to see zero of
+  the recipient's holdings, while the operator, who co-signs, sees them. The
+  private-balance claim is verified on a network we do not control.
+
+This is a single repeatable script, `bot/scripts/devnet-demo.mjs`, that prints
+the whole thing. It is the difference between "it works on my machine" and "it
+works on Canton".
+
 **Engineering state**
 
 - 70 tests green against a live Canton 3.5.9 participant: 44 in the bot
@@ -102,18 +119,18 @@ the ledger is unreachable rather than reporting a comfortable zero.
 
 **Honest limits**
 
-- Per user parties on the shared devnet node need the operator to upload our
-  DAR and allocate parties. Our user has actAs on its own party only. Until
-  then the multi party privacy demo runs on LocalNet, where we are admin.
+- On the shared devnet node we cannot allocate parties or upload code
+  ourselves, both are admin operations. The organiser did both for us, so the
+  multi party demo now runs on devnet, but new handles beyond the parties the
+  organiser hosted can only be created on LocalNet or on a validator we run.
 - Escrow and bill splitting are designed but not built. The old pitch
   promised them. This one does not.
 - Custody is honest but not final. Selkie receives every deposit at one
   Canton party and tracks who owns what in its own contracts, which is an
-  omnibus model, not a per user address. That is a consequence of the shared
-  devnet node, where our user can act only for its own party and cannot
-  allocate more. On a validator we run, and on LocalNet today, every handle
-  already gets its own real Canton party, and that is the path to per user
-  deposit addresses on mainnet.
+  omnibus model, not a per user address. On a validator we run, and on
+  LocalNet today, every handle already gets its own real Canton party, and the
+  devnet run above uses one real party per user, so per user deposit addresses
+  are the natural next step, not a rewrite.
 - Withdrawal to an outside wallet is the other half of this and is not built
   yet. The send path itself is proven, since a cBTC transfer was settled
   through `TransferFactory_Transfer`.
