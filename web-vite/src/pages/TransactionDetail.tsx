@@ -4,7 +4,7 @@ import { ArrowDownLeft, ArrowLeft, ArrowUpRight, Clock, Lock, ShieldCheck, Stick
 import { Header, Shell, Spinner } from "../components/Layout";
 import { TokenIcon } from "../components/TokenIcon";
 import { api, ApiError, type Activity } from "../lib/api";
-import { ASSET_LABEL, money } from "../lib/format";
+import { ASSET_LABEL, counterparty, money } from "../lib/format";
 
 /**
  * A payment's receipt. Dugong's equivalent page is public because Sui puts
@@ -84,8 +84,8 @@ export function TransactionDetail() {
 
               <dl className="mt-8 grid gap-0 rounded-xl border-2 border-pen bg-card-bright px-5 text-left text-sm">
                 {[
-                  [<User size={14} key="i" />, "From", tx.from],
-                  [<User size={14} key="i" />, "To", tx.to],
+                  [<User size={14} key="i" />, "From", counterparty(tx.from)],
+                  [<User size={14} key="i" />, "To", counterparty(tx.to)],
                   [<StickyNote size={14} key="i" />, "Note", tx.memo || "none"],
                   [<Clock size={14} key="i" />, "When", new Date(tx.ts).toLocaleString()],
                   [<ShieldCheck size={14} key="i" />, "Settled on", "Canton"],
@@ -94,10 +94,10 @@ export function TransactionDetail() {
                     key={String(label)}
                     className="flex items-baseline justify-between gap-4 border-b-2 border-pen/10 py-3.5 last:border-0"
                   >
-                    <dt className="flex items-center gap-2 self-center font-bold uppercase tracking-wider text-pen/55 text-[11px]">
+                    <dt className="flex shrink-0 items-center gap-2 self-center font-bold uppercase tracking-wider text-pen/55 text-[11px]">
                       {icon} {label}
                     </dt>
-                    <dd className="text-right font-semibold text-pen/85">{value}</dd>
+                    <dd className="min-w-0 break-words text-right font-semibold text-pen/85">{value}</dd>
                   </div>
                 ))}
               </dl>
@@ -109,8 +109,11 @@ export function TransactionDetail() {
                 </p>
               )}
 
-              <p className="mt-6 flex items-center justify-center gap-2 text-[13px] font-medium text-pen/50">
-                <Lock size={13} /> Only you and {inbound ? tx.from : tx.to} can open this page.
+              <p className="mt-6 flex items-start justify-center gap-2 text-[13px] font-medium text-pen/50">
+                <Lock size={13} className="mt-0.5 shrink-0" />
+                <span className="min-w-0 break-words">
+                  Only you and {counterparty(inbound ? tx.from : tx.to)} can open this page.
+                </span>
               </p>
             </div>
           )}
