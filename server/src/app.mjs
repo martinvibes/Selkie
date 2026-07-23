@@ -151,7 +151,17 @@ export function createApp({ wallet, config, history, cbtc = null }) {
         const profile = await fetchProfile(tokens.access_token);
         // Claiming: the wallet may already exist because someone paid them
         // before they ever logged in. ensureAccount returns it either way.
-        await wallet.ensureAccount(profile.handle, "x");
+        try {
+          await wallet.ensureAccount(profile.handle, "x");
+        } catch (err) {
+          // No pool party left to assign. Sign-in cannot open a wallet, so send
+          // them back to the landing page with a notice rather than a raw 500.
+          if (err.code === "POOL_EXHAUSTED") {
+            res.writeHead(302, { location: "/?login=full" });
+            return res.end();
+          }
+          throw err;
+        }
         return login(res, profile);
       }
 
@@ -161,7 +171,12 @@ export function createApp({ wallet, config, history, cbtc = null }) {
       if (pathname === "/auth/dev" && config.devLogin) {
         const handle = url.searchParams.get("handle");
         if (!handle) return send(res, 400, { error: "handle required" });
-        await wallet.ensureAccount(handle, "x");
+        try {
+          await wallet.ensureAccount(handle, "x");
+        } catch (err) {
+          if (err.code === "POOL_EXHAUSTED") return send(res, 503, { error: err.message, code: err.code });
+          throw err;
+        }
         return login(res, { handle, id: `dev:${normalizeHandle(handle)}`, name: handle, avatar: null });
       }
 
@@ -237,6 +252,10 @@ export function createApp({ wallet, config, history, cbtc = null }) {
             name: session.name,
             avatar: session.avatar,
             walletReady: Boolean(account),
+            // Your own Canton party: the real address behind your handle, the
+            // one people outside Selkie can send to. Null until the wallet is
+            // opened (it is opened at sign-in).
+            address: account?.owner ?? null,
             assets: ASSETS,
           });
         }

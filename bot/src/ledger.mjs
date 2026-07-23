@@ -190,8 +190,36 @@ export class Ledger {
     return this.auth();
   }
 
+  /**
+   * fetch, but forgiving of a slow or flaky shared node.
+   *
+   * The HackCanton devnet participant can take longer than undici's 10s connect
+   * timeout to complete a TLS handshake from a cold process, so a first request
+   * sometimes fails before it is ever sent. We retry, but ONLY on connect-phase
+   * errors — the ones where the request provably never reached the node. That
+   * distinction is what makes retrying a command (a write) safe: a submit that
+   * timed out mid-flight is never retried, so it can never be applied twice.
+   */
+  async #fetchWithRetry(url, init, attempts = 3) {
+    const connectPhase = new Set([
+      "UND_ERR_CONNECT_TIMEOUT",
+      "ENOTFOUND",
+      "ECONNREFUSED",
+      "EAI_AGAIN",
+    ]);
+    for (let i = 1; ; i++) {
+      try {
+        return await fetch(url, init);
+      } catch (err) {
+        const code = err?.cause?.code ?? err?.code;
+        if (i >= attempts || !connectPhase.has(code)) throw err;
+        await new Promise((r) => setTimeout(r, 500 * i));
+      }
+    }
+  }
+
   async request(path, { method = "GET", body } = {}) {
-    const res = await fetch(`${this.baseUrl}${path}`, {
+    const res = await this.#fetchWithRetry(`${this.baseUrl}${path}`, {
       method,
       headers: {
         authorization: `Bearer ${await this.token()}`,
@@ -231,6 +259,22 @@ export class Ledger {
   async listParties() {
     const res = await this.request("/v2/parties");
     return (res.partyDetails ?? []).map((p) => ({ identifier: p.party, isLocal: p.isLocal }));
+  }
+
+  /**
+   * Is this party hosted on the participant we talk to?
+   *
+   * Listing every party is admin-only and a shared node refuses it, but asking
+   * about one specific party is allowed. The distinction matters: the operator
+   * can grant us actAs on a party that is only *allocated*, not *hosted* here
+   * (isLocal=false), and every command submitted as such a party is rejected
+   * with UNKNOWN_SUBMITTERS. So a party is only usable to us when isLocal.
+   */
+  async partyIsLocal(party) {
+    const res = await this.request(`/v2/parties/${encodeURIComponent(party)}`);
+    const details = res.partyDetails ?? res;
+    const one = Array.isArray(details) ? details[0] : details;
+    return Boolean(one?.isLocal);
   }
 
   // --- user rights ------------------------------------------------------

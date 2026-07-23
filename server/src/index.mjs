@@ -52,7 +52,11 @@ if (!operator) {
   console.log(`Using LocalNet operator party. Pin it with:\n  export SELKIE_OPERATOR=${operator}\n`);
 }
 
-const wallet = new Wallet({ ledger, operator });
+// On the shared devnet node we cannot allocate parties, so each new handle
+// claims one from the batch the operator pre-granted us (SELKIE_PARTY_POOL=1).
+// On LocalNet, where we are admin, this stays off and we allocate per handle.
+const pool = process.env.SELKIE_PARTY_POOL === "1";
+const wallet = new Wallet({ ledger, operator, pool });
 const history = new History(process.env.SELKIE_HISTORY ?? join(here, "../../.data/history.jsonl"));
 
 // Throws on a half-configured setup: better no reserve than a wrong one.
@@ -63,5 +67,6 @@ createApp({ wallet, config, history, cbtc }).listen(config.port, () => {
   console.log(`  operator: ${operator}`);
   console.log(`  X login:  ${config.x.clientId ? "configured" : "not configured (set X_CLIENT_ID)"}`);
   console.log(`  cBTC:     ${cbtc ? `live reserve on Canton devnet (${cbtc.party.slice(0, 24)}...)` : "local asset only"}`);
+  console.log(`  parties:  ${pool ? "pool (claim a pre-granted party per handle)" : "allocate per handle"}`);
   if (config.devLogin) console.log("  dev login: ENABLED at /auth/dev?handle=name");
 });

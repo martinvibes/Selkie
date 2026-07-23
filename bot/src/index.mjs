@@ -35,7 +35,10 @@ if (!operator) {
   console.log(`Using LocalNet operator party. Pin it with:\n  export SELKIE_OPERATOR=${operator}\n`);
 }
 
-const wallet = new Wallet({ ledger, operator });
+// Same as the web server: a shared node hands us a pool of parties to claim
+// from, a node we run lets us allocate. SELKIE_PARTY_POOL=1 selects the pool.
+const pool = process.env.SELKIE_PARTY_POOL === "1";
+const wallet = new Wallet({ ledger, operator, pool });
 
 if (!cfg.telegramToken) {
   console.error("SELKIE_TELEGRAM_TOKEN is required to start the bot (get one from @BotFather).");

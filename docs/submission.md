@@ -98,6 +98,13 @@ This is a single repeatable script, `bot/scripts/devnet-demo.mjs`, that prints
 the whole thing. It is the difference between "it works on my machine" and "it
 works on Canton".
 
+And a real cBTC deposit was carried the whole way in: one party sent 0.1 cBTC
+to a Selkie user's deposit address, tagged with their handle, and the wallet
+claimed it by accepting the CIP-56 transfer instruction and crediting the
+handle. The user's cBTC balance went from 0 to 0.1 in the browser, and the
+reserve settled back to 2.0. Money entered Selkie from a separate Canton
+party, through the token standard, end to end.
+
 **Engineering state**
 
 - 70 tests green against a live Canton 3.5.9 participant: 44 in the bot

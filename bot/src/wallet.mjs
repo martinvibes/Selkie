@@ -24,15 +24,33 @@ function partyHint(handle, platform) {
   return `selkie-${platform}-${normalizeHandle(handle).slice(1).replace(/[^a-zA-Z0-9_-]/g, "")}`;
 }
 
+/**
+ * The uniqueness key a handle registers under, namespaced by platform.
+ *
+ * "@bayo" on X and "@bayo" on Telegram are different people in different
+ * namespaces, so they must be different wallets — signing in on one surface
+ * can never reach into the other. The directory enforces one wallet per key,
+ * so the key carries the platform. The Account still stores the bare "@bayo"
+ * for display; only the registry key is qualified.
+ */
+function regKey(handle, platform) {
+  return `${platform}:${normalizeHandle(handle)}`;
+}
+
 export class Wallet {
   /**
    * @param {object} cfg
    * @param {Ledger} cfg.ledger
    * @param {string} cfg.operator - operator party id
+   * @param {boolean} [cfg.pool] - assign wallets from a pre-granted party pool
+   *   instead of allocating one per handle. On a shared node we cannot allocate
+   *   parties, so the operator grants us a batch and each new handle claims a
+   *   free one. On a node we run (LocalNet) this stays off and we allocate.
    */
-  constructor({ ledger, operator }) {
+  constructor({ ledger, operator, pool = false }) {
     this.ledger = ledger;
     this.operator = operator;
+    this.pool = pool;
     this.accountTid = ledger.tid("Account", "Account");
     this.directoryTid = ledger.tid("Account", "AccountDirectory");
     this.holdingTid = ledger.tid("Holding", "Holding");
@@ -91,12 +109,16 @@ export class Wallet {
     return res.contractId;
   }
 
-  /** Fetch an account by handle, or null if this handle has no wallet yet. */
-  async findAccount(handle) {
+  /**
+   * Fetch an account by handle, or null if this handle has no wallet yet.
+   * Scoped to a platform: the same handle on X and on Telegram are separate
+   * wallets, so a lookup names which one it means (default X, the web surface).
+   */
+  async findAccount(handle, platform = "x") {
     const norm = normalizeHandle(handle);
     const acc = await this.ledger.queryOne(
       [this.accountTid],
-      { operator: this.operator, handle: norm },
+      { operator: this.operator, handle: norm, platform },
       [this.operator],
     );
     if (!acc) return null;
@@ -120,18 +142,24 @@ export class Wallet {
    * @returns {Promise<{cid: string, owner: string, handle: string, created: boolean}>}
    */
   async ensureAccount(handle, platform = "x") {
-    const existing = await this.findAccount(handle);
+    const existing = await this.findAccount(handle, platform);
     if (existing) return { ...existing, created: false };
 
     const norm = normalizeHandle(handle);
-    const owner = await this.ensureParty(partyHint(norm, platform));
+    // Two ways to get a party for a new handle. On a shared node we cannot
+    // allocate, so we claim a free one from the pool the operator granted us;
+    // on a node we run we allocate one named after the handle.
+    const owner = this.pool
+      ? await this.#claimPoolParty()
+      : await this.ensureParty(partyHint(norm, platform));
     const dirCid = await this.directoryCid();
 
     // Register the handle and create its Account in ONE transaction. Canton 3
     // has no unique contract keys, so uniqueness comes from the directory:
     // two registrations of the same handle contend on the same contract and
     // one is rejected. Creating the Account in the same transaction means a
-    // rejected registration cannot leave an orphan account behind.
+    // rejected registration cannot leave an orphan account behind. The registry
+    // key is platform-qualified so @bayo can exist on both X and Telegram.
     const tx = await this.ledger.submit(
       [
         {
@@ -139,7 +167,7 @@ export class Wallet {
             templateId: this.directoryTid,
             contractId: dirCid,
             choice: "RegisterHandle",
-            choiceArgument: { handle: norm },
+            choiceArgument: { handle: regKey(norm, platform) },
           },
         },
         {
@@ -158,9 +186,77 @@ export class Wallet {
     return { cid: account?.contractId, owner, handle: norm, created: true };
   }
 
+  /** Parties we may act as that are already somebody's wallet. */
+  async #boundParties() {
+    const accounts = await this.ledger.query(
+      [this.accountTid],
+      { operator: this.operator },
+      [this.operator],
+    );
+    return new Set(accounts.map((a) => a.payload.owner));
+  }
+
+  /**
+   * Take the next free party from the pool the operator granted us.
+   *
+   * A party is usable only if it is hosted here (isLocal) — a granted-but-
+   * unhosted party accepts the grant yet fails every command — and free only if
+   * no Account already owns it. We check "taken" before the network call so we
+   * ask the participant about as few parties as possible.
+   */
+  async #claimPoolParty() {
+    const granted = await this.ledger.myActAsParties();
+    const taken = await this.#boundParties();
+    for (const party of granted) {
+      if (party === this.operator || taken.has(party)) continue;
+      if (await this.ledger.partyIsLocal(party)) return party;
+    }
+    const err = new Error(
+      "Selkie's wallet pool is full — every pre-granted party is in use. " +
+        "Ask the node operator to host and grant more parties.",
+    );
+    err.code = "POOL_EXHAUSTED";
+    throw err;
+  }
+
+  /**
+   * A snapshot of the pool: which granted parties are hosted, which are taken
+   * and by whom, and how many wallets are still available. Feeds the ops CLI
+   * and answers "how many more people can sign up right now".
+   */
+  async poolStatus() {
+    const granted = await this.ledger.myActAsParties();
+    const accounts = await this.ledger.query(
+      [this.accountTid],
+      { operator: this.operator },
+      [this.operator],
+    );
+    const byOwner = new Map(accounts.map((a) => [a.payload.owner, a.payload]));
+    const slots = [];
+    for (const party of granted) {
+      if (party === this.operator) continue;
+      const acc = byOwner.get(party);
+      slots.push({
+        party,
+        hosted: await this.ledger.partyIsLocal(party),
+        handle: acc?.handle ?? null,
+        platform: acc?.platform ?? null,
+        taken: Boolean(acc),
+      });
+    }
+    return {
+      operator: this.operator,
+      total: slots.length,
+      hosted: slots.filter((s) => s.hosted).length,
+      taken: slots.filter((s) => s.taken).length,
+      free: slots.filter((s) => s.hosted && !s.taken).length,
+      slots,
+    };
+  }
+
   /** All holdings for a handle's owner party. */
-  async holdings(handle) {
-    const acc = await this.findAccount(handle);
+  async holdings(handle, platform = "x") {
+    const acc = await this.findAccount(handle, platform);
     if (!acc) return [];
     const res = await this.ledger.query([this.holdingTid], { owner: acc.owner }, [this.operator]);
     return res.map((c) => ({
@@ -171,8 +267,8 @@ export class Wallet {
   }
 
   /** Balance per asset, e.g. { CBTC: 0.75, USDCX: 20 }. */
-  async balance(handle) {
-    const hs = await this.holdings(handle);
+  async balance(handle, platform = "x") {
+    const hs = await this.holdings(handle, platform);
     return hs.reduce((acc, h) => {
       acc[h.asset] = (acc[h.asset] ?? 0) + h.amount;
       return acc;
@@ -199,8 +295,8 @@ export class Wallet {
    * Find one holding of `asset` worth at least `amount`, merging fragments
    * when change has split the balance across contracts.
    */
-  async fundingHolding(handle, asset, amount) {
-    const matching = (await this.holdings(handle)).filter((h) => h.asset === asset);
+  async fundingHolding(handle, asset, amount, platform = "x") {
+    const matching = (await this.holdings(handle, platform)).filter((h) => h.asset === asset);
     const single = matching.find((h) => h.amount >= amount);
     if (single) return single.cid;
 
@@ -235,7 +331,7 @@ export class Wallet {
     if (!ASSETS.includes(asset)) throw new Error(`unknown asset: ${asset}`);
     if (!(value > 0)) throw new Error("amount must be positive");
 
-    const sender = await this.findAccount(from);
+    const sender = await this.findAccount(from, platform);
     if (!sender) {
       const err = new Error(`${normalizeHandle(from)} has no Selkie wallet yet`);
       err.code = "NO_SENDER_WALLET";
@@ -244,7 +340,7 @@ export class Wallet {
     const recipient = await this.ensureAccount(to, platform);
     if (recipient.owner === sender.owner) throw new Error("cannot send to yourself");
 
-    const holdingCid = await this.fundingHolding(from, asset, value);
+    const holdingCid = await this.fundingHolding(from, asset, value, platform);
 
     const instr = await this.ledger.create(
       this.transferTid,
@@ -328,8 +424,8 @@ export class Wallet {
    * `incoming` is money someone wants from you, `outgoing` is money you asked
    * for. The ledger only shows each party their own, which is the point.
    */
-  async requests(handle) {
-    const acc = await this.findAccount(handle);
+  async requests(handle, platform = "x") {
+    const acc = await this.findAccount(handle, platform);
     if (!acc) return { incoming: [], outgoing: [] };
 
     const rows = await this.ledger.query([this.requestTid], {}, [this.operator]);
@@ -373,9 +469,9 @@ export class Wallet {
    * Pay a request. The payer must be the party the request names, so an
    * approval from anyone else is refused before it reaches the ledger.
    */
-  async approveRequest({ cid, payerHandle }) {
+  async approveRequest({ cid, payerHandle, platform = "x" }) {
     const req = await this.#findRequest(cid);
-    const payer = await this.findAccount(payerHandle);
+    const payer = await this.findAccount(payerHandle, platform);
     if (!payer || payer.owner !== req.payload.payer) {
       const err = new Error("that request is not addressed to you");
       err.code = "NOT_YOUR_REQUEST";
@@ -387,7 +483,7 @@ export class Wallet {
 
     const asset = req.payload.asset;
     const amount = Number(req.payload.amount);
-    const holdingCid = await this.fundingHolding(payerHandle, asset, amount);
+    const holdingCid = await this.fundingHolding(payerHandle, asset, amount, platform);
 
     await this.ledger.exercise(
       this.requestTid,
@@ -405,9 +501,9 @@ export class Wallet {
   }
 
   /** Turn a request down. Only the payer can. */
-  async declineRequest({ cid, payerHandle }) {
+  async declineRequest({ cid, payerHandle, platform = "x" }) {
     const req = await this.#findRequest(cid);
-    const payer = await this.findAccount(payerHandle);
+    const payer = await this.findAccount(payerHandle, platform);
     if (!payer || payer.owner !== req.payload.payer) {
       const err = new Error("that request is not addressed to you");
       err.code = "NOT_YOUR_REQUEST";
@@ -418,9 +514,9 @@ export class Wallet {
   }
 
   /** Take back a request you sent. Only the requester can. */
-  async cancelRequest({ cid, requesterHandle }) {
+  async cancelRequest({ cid, requesterHandle, platform = "x" }) {
     const req = await this.#findRequest(cid);
-    const requester = await this.findAccount(requesterHandle);
+    const requester = await this.findAccount(requesterHandle, platform);
     if (!requester || requester.owner !== req.payload.requester) {
       const err = new Error("that is not your request to cancel");
       err.code = "NOT_YOUR_REQUEST";

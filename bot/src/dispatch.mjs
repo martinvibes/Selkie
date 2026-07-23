@@ -43,7 +43,7 @@ export async function handleCommand({ wallet, from, text, platform = "x" }) {
     switch (cmd.type) {
       case "balance": {
         await wallet.ensureAccount(from, platform);
-        return formatBalance(await wallet.balance(from));
+        return formatBalance(await wallet.balance(from, platform));
       }
 
       case "send": {
@@ -83,7 +83,7 @@ export async function handleCommand({ wallet, from, text, platform = "x" }) {
       }
 
       case "requests": {
-        const { incoming, outgoing } = await wallet.requests(from);
+        const { incoming, outgoing } = await wallet.requests(from, platform);
         if (!incoming.length && !outgoing.length) return "No open requests.";
         const lines = [];
         if (incoming.length) {
@@ -105,7 +105,7 @@ export async function handleCommand({ wallet, from, text, platform = "x" }) {
 
       case "approve":
       case "decline": {
-        const { incoming } = await wallet.requests(from);
+        const { incoming } = await wallet.requests(from, platform);
         if (!incoming.length) return "You have no open requests to answer.";
 
         const wanted = cmd.from ? normalizeHandle(cmd.from) : null;
@@ -118,10 +118,10 @@ export async function handleCommand({ wallet, from, text, platform = "x" }) {
 
         const target = matches[0];
         if (cmd.type === "decline") {
-          await wallet.declineRequest({ cid: target.cid, payerHandle: from });
+          await wallet.declineRequest({ cid: target.cid, payerHandle: from, platform });
           return `Declined ${target.from}'s request for ${fmt(target.amount)} ${target.asset}. No money moved.`;
         }
-        const paid = await wallet.approveRequest({ cid: target.cid, payerHandle: from });
+        const paid = await wallet.approveRequest({ cid: target.cid, payerHandle: from, platform });
         return `Paid ${paid.to} ${fmt(paid.amount)} ${paid.asset}.\nSettled on Canton. Nobody else can see the amount.`;
       }
 
