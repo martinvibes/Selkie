@@ -6,6 +6,8 @@ export type Me = {
   name?: string;
   avatar?: string | null;
   walletReady: boolean;
+  /** Your own Canton party — the real address behind your handle. */
+  address?: string | null;
   assets: string[];
 };
 

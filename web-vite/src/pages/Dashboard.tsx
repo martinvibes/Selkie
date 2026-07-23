@@ -37,7 +37,7 @@ import { ASSET_LABEL, counterparty, money, parseHandles, timeAgo } from "../lib/
 const TABS = [
   { id: "activity", label: "Activity", icon: <ActivityIcon size={19} /> },
   { id: "send", label: "Send", icon: <Send size={18} /> },
-  { id: "deposit", label: "Deposit", icon: <ArrowDownToLine size={19} /> },
+  { id: "deposit", label: "Receive", icon: <ArrowDownToLine size={19} /> },
   { id: "requests", label: "Requests", icon: <HandCoins size={19} /> },
   { id: "campaign", label: "Pay many", icon: <Sparkles size={18} /> },
 ] as const;
@@ -447,7 +447,37 @@ function CopyField({ label, value }: { label: string; value: string }) {
   );
 }
 
-function DepositPanel({ onDone }: { onDone: () => void }) {
+/** Your two ways to get paid: your handle, and the address behind it. */
+function ReceiveCard({ me }: { me: Me }) {
+  return (
+    <section className="chunk p-6 sm:p-7">
+      <div className="flex items-center gap-3.5">
+        <Avatar me={me} size={44} />
+        <div className="leading-tight">
+          <p className="eyebrow">Get paid</p>
+          <h2 className="mt-0.5 font-display text-2xl font-bold tracking-tight">{me.handle}</h2>
+        </div>
+      </div>
+      <p className="mt-4 text-sm font-medium text-pen/60">
+        On Selkie, people pay you by your handle — nothing to paste, no app to install. Share your
+        handle, or your Canton address for wallets elsewhere on the network.
+      </p>
+      <div className="mt-5 grid gap-4">
+        <CopyField label="Your handle" value={me.handle} />
+        {me.address && <CopyField label="Your Canton address" value={me.address} />}
+      </div>
+      <p className="mt-4 flex items-start gap-2.5 border-t-2 border-pen/10 pt-4 text-[13px] font-medium text-pen/55">
+        <Lock size={13} className="mt-0.5 shrink-0" />
+        <span>
+          Your handle is the instant path inside Selkie. The address is the on-ledger identity behind
+          it — the same wallet, shown the way the rest of Canton addresses it.
+        </span>
+      </p>
+    </section>
+  );
+}
+
+function DepositPanel({ me, onDone }: { me: Me; onDone: () => void }) {
   const [info, setInfo] = useState<Deposit | null>(null);
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<DepositClaim | null>(null);
@@ -479,22 +509,33 @@ function DepositPanel({ onDone }: { onDone: () => void }) {
     }
   }
 
-  if (!info) return <div className="chunk p-10 text-center font-bold text-pen/50">Loading…</div>;
+  if (!info)
+    return (
+      <div className="grid gap-6">
+        <ReceiveCard me={me} />
+        <div className="chunk p-10 text-center font-bold text-pen/50">Loading…</div>
+      </div>
+    );
 
   if (!info.active) {
     return (
-      <section className="chunk p-6 sm:p-7">
-        <p className="font-display text-lg font-bold">Deposits are off on this build</p>
-        <p className="mt-2 text-sm font-medium text-pen/60">
-          Selkie takes deposits in cBTC on Canton devnet. This instance is running without a devnet
-          connection, so there is nowhere to receive.
-        </p>
-      </section>
+      <div className="grid gap-6">
+        <ReceiveCard me={me} />
+        <section className="chunk p-6 sm:p-7">
+          <p className="font-display text-lg font-bold">cBTC funding is off on this build</p>
+          <p className="mt-2 text-sm font-medium text-pen/60">
+            Selkie pulls in cBTC on Canton devnet. This instance is running without a devnet
+            connection, so there is nowhere to receive it — but your handle and address above still
+            work for payments inside Selkie.
+          </p>
+        </section>
+      </div>
     );
   }
 
   return (
     <div className="grid gap-6">
+      <ReceiveCard me={me} />
       <section className="chunk p-6 sm:p-7">
         <p className="font-display text-lg font-bold">
           Fund your wallet with {ASSET_LABEL[info.instrument] ?? info.instrument}
@@ -1035,7 +1076,7 @@ export function Dashboard() {
                   {tab === "send" && (
                     <SendPanel assets={me.assets} presetTo={presetTo} onDone={refresh} />
                   )}
-                  {tab === "deposit" && <DepositPanel onDone={refresh} />}
+                  {tab === "deposit" && <DepositPanel me={me} onDone={refresh} />}
                   {tab === "requests" && (
                     <RequestsPanel assets={me.assets} requests={requests} onDone={refresh} />
                   )}

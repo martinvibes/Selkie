@@ -11,6 +11,7 @@ const HELP = [
   "request 10 CC from @ada",
   "requests            see who is waiting on you",
   "approve @ada        pay what they asked for",
+  "receive             your handle + address to get paid",
   "balance",
   "",
   "Assets: CC, USDCX, CBTC, CETH. No app, no seed phrase, no gas.",
