@@ -1107,6 +1107,23 @@ export function Dashboard() {
     void refresh();
   }, [refresh]);
 
+  // Money can land while you're just looking at your balance: the server sweeps
+  // incoming Canton Coin on its own, so poll quietly to let a deposit appear
+  // without a tap. Pause while the tab is hidden, and catch up when it's shown
+  // again, so a backgrounded wallet isn't hammering the ledger.
+  useEffect(() => {
+    if (!me) return;
+    const tick = () => {
+      if (document.visibilityState === "visible") void refresh();
+    };
+    const id = window.setInterval(tick, 8_000);
+    document.addEventListener("visibilitychange", tick);
+    return () => {
+      window.clearInterval(id);
+      document.removeEventListener("visibilitychange", tick);
+    };
+  }, [me, refresh]);
+
   if (loading) return <Spinner />;
   if (!me) return <Navigate to="/" replace />;
   if (!tab || !TABS.some((t) => t.id === tab)) return <Navigate to="/dashboard/activity" replace />;

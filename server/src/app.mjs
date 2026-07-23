@@ -9,6 +9,7 @@ import { readFile } from "node:fs/promises";
 import { extname, join, normalize } from "node:path";
 import { normalizeHandle, ASSETS } from "../../bot/src/wallet.mjs";
 import { HANDLE_KEY } from "../../bot/src/cbtc.mjs";
+import { claimCcFor } from "./deposits.mjs";
 import { seal, unseal, parseCookies, cookie, clearCookie } from "./session.mjs";
 import { pkce, authorizeUrl, exchangeCode, fetchProfile } from "./xauth.mjs";
 
@@ -397,32 +398,21 @@ export function createApp({ wallet, config, history, cbtc = null, amulet = null 
             }
 
             // Canton Coin: Amulet transfers sent straight to the handle's own
-            // party. No tag needed, the party itself is the address, so we
-            // accept as that party and credit the handle it belongs to.
+            // party. No tag needed, the party itself is the address. The same
+            // accept-and-credit runs on a timer for every handle (see the
+            // sweeper), so this shares one helper with it and cannot drift.
             if (amulet) {
               const account = await wallet.findAccount(session.handle);
-              const userParty = account?.owner;
-              if (userParty) {
-                for (const t of await amulet.pendingFor(userParty)) {
-                  const { updateId } = await amulet.acceptFor(userParty, t.cid);
-                  await wallet.deposit(session.handle, "CC", t.amount);
-                  const logged = await history.append({
-                    type: "deposit",
-                    from: t.sender,
-                    to: session.handle,
-                    asset: "CC",
-                    amount: t.amount,
-                    memo: "deposit from Canton Coin",
-                    onboarded: false,
-                  });
-                  claimed.push({
-                    asset: "CC",
-                    amount: t.amount,
-                    sender: t.sender,
-                    updateId,
-                    id: logged.id,
-                  });
-                }
+              if (account?.owner) {
+                claimed.push(
+                  ...(await claimCcFor({
+                    wallet,
+                    amulet,
+                    history,
+                    handle: session.handle,
+                    party: account.owner,
+                  })),
+                );
               }
             }
 

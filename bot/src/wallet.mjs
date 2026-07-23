@@ -137,6 +137,24 @@ export class Wallet {
   }
 
   /**
+   * Every wallet we hold, as {cid, owner, handle, platform}. Used to sweep
+   * incoming deposits across all handles at once, not just the signed-in one.
+   */
+  async accounts() {
+    const rows = await this.ledger.query(
+      [this.accountTid],
+      { operator: this.operator },
+      [this.operator],
+    );
+    return rows.map((a) => ({
+      cid: a.contractId,
+      owner: a.payload.owner,
+      handle: a.payload.handle,
+      platform: a.payload.platform,
+    }));
+  }
+
+  /**
    * Get the wallet for a handle, creating it if this is the first time we've
    * seen them. Auto-onboarding: no app, no seed phrase, no signup.
    * @returns {Promise<{cid: string, owner: string, handle: string, created: boolean}>}
@@ -188,12 +206,7 @@ export class Wallet {
 
   /** Parties we may act as that are already somebody's wallet. */
   async #boundParties() {
-    const accounts = await this.ledger.query(
-      [this.accountTid],
-      { operator: this.operator },
-      [this.operator],
-    );
-    return new Set(accounts.map((a) => a.payload.owner));
+    return new Set((await this.accounts()).map((a) => a.owner));
   }
 
   /**

@@ -11,6 +11,7 @@ import { amuletFromEnv } from "../../bot/src/amulet.mjs";
 import { Wallet } from "../../bot/src/wallet.mjs";
 import { History } from "./history.mjs";
 import { createApp } from "./app.mjs";
+import { startCcSweeper } from "./sweeper.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 
@@ -75,3 +76,9 @@ createApp({ wallet, config, history, cbtc, amulet }).listen(config.port, () => {
   console.log(`  parties:  ${pool ? "pool (claim a pre-granted party per handle)" : "allocate per handle"}`);
   if (config.devLogin) console.log("  dev login: ENABLED at /auth/dev?handle=name");
 });
+
+// Accept incoming Canton Coin for every handle on a timer, so a deposit lands
+// on its own instead of waiting for someone to open the Deposit page.
+const sweepMs = Number(process.env.SELKIE_SWEEP_MS ?? 8_000);
+startCcSweeper({ wallet, amulet, history, intervalMs: sweepMs });
+if (amulet) console.log(`  CC sweep: every ${Math.round(sweepMs / 1000)}s`);
