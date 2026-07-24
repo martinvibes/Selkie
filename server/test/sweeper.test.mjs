@@ -1,21 +1,24 @@
-// The background CC sweeper and the shared claim helper. The ledger is faked by
-// a pending queue that drains as transfers are accepted, the way the real ledger
-// consumes an instruction on accept. What matters: every claimed handle gets
-// swept, one handle's failure doesn't sink the others, and a transfer is never
-// taken (or credited) twice even when the endpoint and the sweeper race.
+// The background token sweeper and the shared claim helper. The ledger is faked
+// by a pending queue that drains as transfers are accepted, the way the real
+// ledger consumes an instruction on accept. What matters: every claimed handle
+// gets swept across every token, one handle/token failure doesn't sink the rest,
+// and a transfer is never taken (or credited) twice even when the endpoint and
+// the sweeper race.
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { sweepAll, startCcSweeper } from "../src/sweeper.mjs";
-import { claimCcFor } from "../src/deposits.mjs";
+import { sweepAll, startSweeper } from "../src/sweeper.mjs";
+import { claimTokenFor } from "../src/deposits.mjs";
 
 const silent = { log() {}, warn() {} };
 
-// A CC client whose per-party queue drains on accept; accepting a cid twice
+// A token client whose per-party queue drains on accept; accepting a cid twice
 // fails, exactly as re-accepting a consumed instruction would on-ledger.
-function fakeAmulet(pendingByParty) {
+function fakeToken(asset, label, pendingByParty) {
   const accepts = [];
   return {
+    asset,
+    label,
     accepts,
     async pendingFor(party) {
       return [...(pendingByParty.get(party) ?? [])];
@@ -49,12 +52,20 @@ function recorder() {
   };
 }
 
-test("sweepAll accepts and credits pending CC for every claimed handle", async () => {
-  const pending = new Map([
-    ["pA", [{ cid: "a1", sender: "s1::1220", amount: 25 }]],
-    ["pB", [{ cid: "b1", sender: "s2::1220", amount: 4 }]],
-  ]);
-  const amulet = fakeAmulet(pending);
+test("sweepAll accepts and credits every token for every claimed handle", async () => {
+  const cc = fakeToken(
+    "CC",
+    "Canton Coin",
+    new Map([["pA", [{ cid: "a1", sender: "s1::1220", amount: 25 }]]]),
+  );
+  const cbtc = fakeToken(
+    "CBTC",
+    "cBTC",
+    new Map([
+      ["pA", [{ cid: "a2", sender: "s3::1220", amount: 0.5 }]],
+      ["pB", [{ cid: "b1", sender: "s2::1220", amount: 0.1 }]],
+    ]),
+  );
   const { wallet: w, history, credited, logged } = recorder();
   const wallet = {
     ...w,
@@ -64,28 +75,26 @@ test("sweepAll accepts and credits pending CC for every claimed handle", async (
     ],
   };
 
-  const swept = await sweepAll({ wallet, amulet, history, log: silent });
+  const swept = await sweepAll({ wallet, tokens: [cc, cbtc], history, log: silent });
 
-  assert.equal(swept.length, 2);
+  assert.equal(swept.length, 3);
   assert.deepEqual(credited, [
     { handle: "@ada", asset: "CC", amount: 25 },
-    { handle: "@bayo", asset: "CC", amount: 4 },
+    { handle: "@ada", asset: "CBTC", amount: 0.5 },
+    { handle: "@bayo", asset: "CBTC", amount: 0.1 },
   ]);
-  assert.deepEqual(
-    amulet.accepts.map((a) => a.cid),
-    ["a1", "b1"],
-  );
-  assert.equal(logged.length, 2);
-  assert.ok(logged.every((e) => e.type === "deposit" && e.asset === "CC"));
-  assert.equal(logged[0].to, "@ada");
+  assert.deepEqual(cc.accepts.map((a) => a.cid), ["a1"]);
+  assert.deepEqual(cbtc.accepts.map((a) => a.cid), ["a2", "b1"]);
+  assert.equal(logged.length, 3);
+  assert.ok(logged.every((e) => e.type === "deposit"));
   assert.equal(logged[0].memo, "deposit from Canton Coin");
+  assert.equal(logged[1].memo, "deposit from cBTC");
 });
 
-test("sweepAll skips a failing handle and still sweeps the others", async () => {
-  const pending = new Map([["pB", [{ cid: "b1", sender: "s2::1220", amount: 4 }]]]);
-  const amulet = fakeAmulet(pending);
-  const ok = amulet.pendingFor.bind(amulet);
-  amulet.pendingFor = async (party) => {
+test("sweepAll skips a failing handle/token and still sweeps the rest", async () => {
+  const cbtc = fakeToken("CBTC", "cBTC", new Map([["pB", [{ cid: "b1", sender: "s2::1220", amount: 4 }]]]));
+  const ok = cbtc.pendingFor.bind(cbtc);
+  cbtc.pendingFor = async (party) => {
     if (party === "pA") throw new Error("participant hiccup");
     return ok(party);
   };
@@ -98,27 +107,26 @@ test("sweepAll skips a failing handle and still sweeps the others", async () => 
     ],
   };
 
-  const swept = await sweepAll({ wallet, amulet, history, log: silent });
+  const swept = await sweepAll({ wallet, tokens: [cbtc], history, log: silent });
 
-  assert.deepEqual(credited, [{ handle: "@bayo", asset: "CC", amount: 4 }]);
+  assert.deepEqual(credited, [{ handle: "@bayo", asset: "CBTC", amount: 4 }]);
   assert.equal(swept.length, 1);
 });
 
-test("claimCcFor serialises one party so a racing claim can't double-take", async () => {
-  const pending = new Map([["pA", [{ cid: "a1", sender: "s1::1220", amount: 25 }]]]);
-  const amulet = fakeAmulet(pending);
+test("claimTokenFor serialises one party so a racing claim can't double-take", async () => {
+  const token = fakeToken("CC", "Canton Coin", new Map([["pA", [{ cid: "a1", sender: "s1::1220", amount: 25 }]]]));
   const { wallet, history, credited } = recorder();
-  const args = { wallet, amulet, history, handle: "@ada", party: "pA" };
+  const args = { wallet, token, history, handle: "@ada", party: "pA" };
 
   // The Deposit page and the sweeper both go for the same party at once.
-  const [one, two] = await Promise.all([claimCcFor(args), claimCcFor(args)]);
+  const [one, two] = await Promise.all([claimTokenFor(args), claimTokenFor(args)]);
 
   assert.equal(one.length + two.length, 1, "only one of the racing claims took it");
-  assert.equal(amulet.accepts.length, 1, "the transfer was accepted exactly once");
+  assert.equal(token.accepts.length, 1, "the transfer was accepted exactly once");
   assert.deepEqual(credited, [{ handle: "@ada", asset: "CC", amount: 25 }]);
 });
 
-test("startCcSweeper is a no-op when CC is off", () => {
+test("startSweeper is a no-op when no tokens are configured", () => {
   let touched = false;
   const wallet = {
     accounts: async () => {
@@ -126,7 +134,7 @@ test("startCcSweeper is a no-op when CC is off", () => {
       return [];
     },
   };
-  const sweeper = startCcSweeper({ wallet, amulet: null, history: {}, log: silent });
+  const sweeper = startSweeper({ wallet, tokens: [], history: {}, log: silent });
   sweeper.stop();
-  assert.equal(touched, false, "no amulet means no ledger work at all");
+  assert.equal(touched, false, "no tokens means no ledger work at all");
 });

@@ -8,8 +8,7 @@ import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
 import { extname, join, normalize } from "node:path";
 import { normalizeHandle, ASSETS } from "../../bot/src/wallet.mjs";
-import { HANDLE_KEY } from "../../bot/src/cbtc.mjs";
-import { claimCcFor } from "./deposits.mjs";
+import { claimTokenFor } from "./deposits.mjs";
 import { seal, unseal, parseCookies, cookie, clearCookie } from "./session.mjs";
 import { pkce, authorizeUrl, exchangeCode, fetchProfile } from "./xauth.mjs";
 
@@ -27,11 +26,11 @@ const MIME = {
 const SESSION = "selkie_session";
 const OAUTH = "selkie_oauth";
 
-export function createApp({ wallet, config, history, cbtc = null, amulet = null }) {
-  // One reserve read serves everyone for 30s: the endpoint is public, and the
-  // ledger should not be re-queried per pageview.
-  let reserveCache = null;
-  const operatorHandle = config.operatorHandle ? normalizeHandle(config.operatorHandle) : null;
+export function createApp({ wallet, config, history, tokens = [] }) {
+  // Real on-ledger backing is read per handle (each handle's own party holds its
+  // own tokens), cached ~20s by party so a balance page can poll without hitting
+  // the ledger every time.
+  const reserveCache = new Map(); // party -> { at, holdings }
   const send = (res, status, body, headers = {}) => {
     const payload = JSON.stringify(body);
     res.writeHead(status, {
@@ -201,31 +200,6 @@ export function createApp({ wallet, config, history, cbtc = null, amulet = null 
         });
       }
 
-      // Deliberately public, like the account pages: anyone can verify that
-      // Selkie's cBTC is matched by real holdings on Canton devnet without
-      // signing in. It reveals the operator's reserve and nothing about users.
-      if (pathname === "/api/reserve" && req.method === "GET") {
-        if (!cbtc) return send(res, 200, { active: false });
-        try {
-          if (!reserveCache || Date.now() - reserveCache.at > 30_000) {
-            reserveCache = { at: Date.now(), holdings: await cbtc.holdings() };
-          }
-          const { at, holdings } = reserveCache;
-          return send(res, 200, {
-            active: true,
-            instrument: cbtc.instrument,
-            network: "Canton devnet",
-            party: cbtc.party,
-            total: holdings.total,
-            unlocked: holdings.unlocked,
-            contracts: holdings.contracts,
-            asOf: new Date(at).toISOString(),
-          });
-        } catch (err) {
-          return send(res, 503, { error: `reserve unavailable: ${err.message}` });
-        }
-      }
-
       // --- API --------------------------------------------------------
       if (pathname.startsWith("/api/")) {
         const session = sessionOf(req);
@@ -309,122 +283,93 @@ export function createApp({ wallet, config, history, cbtc = null, amulet = null 
 
         // Where money gets into Selkie from the outside world.
         //
-        // Selkie receives at ONE Canton party and keeps per-handle ownership in
-        // its own contracts, so the address below is the same for everybody and
-        // the handle tag is what makes a deposit yours. We say so plainly here
-        // rather than dressing a shared address up as a personal one.
+        // Every token now lands at the handle's OWN Canton party, so there is a
+        // single personal address that receives both CC and cBTC. We surface it
+        // together with whatever is already waiting there, per asset, so the UI
+        // can offer to accept it.
         if (pathname === "/api/deposit" && req.method === "GET") {
-          if (!cbtc && !amulet) return send(res, 200, { active: false });
-          // Canton Coin lands at the handle's OWN party (its real Canton
-          // address), so its deposit address is personal, not the shared cBTC
-          // one. Surface any transfers already waiting there so the UI can
-          // offer to accept them.
-          let cc = null;
-          if (amulet) {
-            const account = await wallet.findAccount(session.handle);
-            const userParty = account?.owner ?? null;
-            if (userParty) {
-              try {
-                cc = {
-                  address: userParty,
-                  pending: (await amulet.pendingFor(userParty)).map((p) => ({
-                    amount: p.amount,
-                    sender: p.sender,
-                  })),
-                };
-              } catch {
-                cc = { address: userParty, pending: [] };
+          if (!tokens.length) return send(res, 200, { active: false });
+          const account = await wallet.findAccount(session.handle);
+          const userParty = account?.owner ?? null;
+          if (!userParty) return send(res, 200, { active: false });
+          const pending = [];
+          for (const token of tokens) {
+            try {
+              for (const p of await token.pendingFor(userParty)) {
+                pending.push({ asset: token.asset, amount: p.amount, sender: p.sender });
               }
+            } catch {
+              // A registry hiccup on one token must not hide the address itself.
             }
           }
           return send(res, 200, {
-            active: Boolean(cbtc),
-            cc,
-            ...(cbtc
-              ? {
-                  address: cbtc.party,
-                  network: "Canton devnet",
-                  instrument: cbtc.instrument,
-                  tagKey: HANDLE_KEY,
-                  tag: session.handle,
-                  isOperator: operatorHandle === session.handle,
-                }
-              : {}),
+            active: true,
+            address: userParty,
+            network: "Canton devnet",
+            assets: tokens.map((t) => t.asset),
+            pending,
           });
         }
 
-        // Claiming is receiver-side by design: on the token standard an
-        // incoming transfer waits as an instruction until we accept it, so
-        // nothing lands in a wallet without Selkie exercising a choice.
+        // Claiming is receiver-side by design: on the token standard an incoming
+        // transfer waits as an instruction until we accept it, so nothing lands
+        // in a wallet without Selkie exercising a choice. The same accept-credit
+        // runs on a timer for every handle (see the sweeper); this shares one
+        // helper with it, over every token, so the two cannot drift.
         if (pathname === "/api/deposit/claim" && req.method === "POST") {
-          if (!cbtc && !amulet) return send(res, 400, { error: "deposits are not configured" });
+          if (!tokens.length) return send(res, 400, { error: "deposits are not configured" });
           try {
-            const body = await readBody(req);
+            const account = await wallet.findAccount(session.handle);
+            if (!account?.owner) return send(res, 200, { claimed: [], total: 0 });
             const claimed = [];
-            let unattributed = 0;
-
-            // cBTC: token-standard transfers to the shared deposit party,
-            // attributed by the handle tag. Untagged transfers, e.g. straight
-            // from the cBTC faucet, name nobody. Only the handle that runs the
-            // deposit party may take them, and only by asking explicitly.
-            if (cbtc) {
-              const sweeping =
-                Boolean(body.includeUntagged) && operatorHandle === session.handle;
-              const waiting = await cbtc.pending();
-              const mine = waiting.filter((t) =>
-                t.handle ? normalizeHandle(t.handle) === session.handle : sweeping,
+            for (const token of tokens) {
+              claimed.push(
+                ...(await claimTokenFor({
+                  wallet,
+                  token,
+                  history,
+                  handle: session.handle,
+                  party: account.owner,
+                })),
               );
-              unattributed = sweeping ? 0 : waiting.filter((t) => !t.handle).length;
-              for (const t of mine) {
-                const { updateId } = await cbtc.accept(t.cid);
-                await wallet.deposit(session.handle, cbtc.instrument, t.amount);
-                const logged = await history.append({
-                  type: "deposit",
-                  from: t.sender,
-                  to: session.handle,
-                  asset: cbtc.instrument,
-                  amount: t.amount,
-                  memo: "deposit from Canton",
-                  onboarded: false,
-                });
-                claimed.push({
-                  asset: cbtc.instrument,
-                  amount: t.amount,
-                  sender: t.sender,
-                  updateId,
-                  id: logged.id,
-                });
-              }
             }
-
-            // Canton Coin: Amulet transfers sent straight to the handle's own
-            // party. No tag needed, the party itself is the address. The same
-            // accept-and-credit runs on a timer for every handle (see the
-            // sweeper), so this shares one helper with it and cannot drift.
-            if (amulet) {
-              const account = await wallet.findAccount(session.handle);
-              if (account?.owner) {
-                claimed.push(
-                  ...(await claimCcFor({
-                    wallet,
-                    amulet,
-                    history,
-                    handle: session.handle,
-                    party: account.owner,
-                  })),
-                );
-              }
-            }
-
-            // The cBTC reserve may have moved, so the cached copy is now a lie.
-            if (claimed.length) reserveCache = null;
+            // Real holdings moved, so this party's cached backing is now stale.
+            if (claimed.length) reserveCache.delete(account.owner);
             return send(res, 200, {
               claimed,
               total: claimed.reduce((n, c) => n + c.amount, 0),
-              unattributed,
             });
           } catch (err) {
             return send(res, 502, { error: `deposit check failed: ${err.message}` });
+          }
+        }
+
+        // Your balance's real on-ledger backing: the actual unlocked holdings
+        // sitting at your own Canton party, per token. Proves the peg for you
+        // specifically, the way the shared reserve used to prove it in aggregate.
+        if (pathname === "/api/reserve" && req.method === "GET") {
+          const account = await wallet.findAccount(session.handle);
+          const userParty = account?.owner ?? null;
+          if (!tokens.length || !userParty) return send(res, 200, { active: false });
+          try {
+            let cached = reserveCache.get(userParty);
+            if (!cached || Date.now() - cached.at > 20_000) {
+              const holdings = [];
+              for (const token of tokens) {
+                holdings.push({ asset: token.asset, amount: await token.holdingsFor(userParty) });
+              }
+              cached = { at: Date.now(), holdings };
+              reserveCache.set(userParty, cached);
+            }
+            return send(res, 200, {
+              active: true,
+              network: "Canton devnet",
+              address: userParty,
+              holdings: cached.holdings,
+              asOf: new Date(cached.at).toISOString(),
+            });
+          } catch (err) {
+            return send(res, 503, { error: `reserve unavailable: ${err.message}` });
           }
         }
 

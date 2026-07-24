@@ -1,40 +1,47 @@
-// Real Canton Coin (Amulet) deposits, via the CIP-56 token standard.
+// One client for every CIP-56 token Selkie accepts at a handle's own party.
 //
-// When someone sends CC from the Canton Coin Wallet to a Selkie handle, it
-// lands as an AmuletTransferInstruction addressed to that handle's own party
-// (its pool party is its real Canton address). The coins sit there until the
-// receiver accepts, exactly like cBTC. The difference from cBTC is only where
-// the choice context comes from: Amulet's registry is the validator's
-// scan-proxy, which needs our bearer token, whereas the cBTC registry is a
-// public issuer endpoint. The accept itself is the same interface choice.
+// Canton Coin (Amulet) and cBTC implement the SAME token-standard interfaces:
+// a transfer to you lands as a TransferInstruction you accept, and what you own
+// sits as Holding contracts. So accepting an incoming deposit at a handle's own
+// Canton party is the exact same dance for both. The only things that differ:
 //
-// We accept as the handle's own party (Selkie holds act-as rights on the whole
-// pool), so the real CC ends up owned by the user's own address. The internal
-// Selkie balance is then credited to mirror it — see the deposit-claim path.
+//   - the instrument id we filter for ("Amulet" vs "CBTC"), and
+//   - where the accept's choice context comes from: Amulet's is the validator
+//     scan-proxy, which needs our bearer token; cBTC's is the issuer's public
+//     registry, which needs none.
+//
+// We accept as the handle's own party (Selkie holds act-as on the whole pool),
+// so the real token ends up owned by the user's own address. The internal
+// Selkie balance is credited 1:1 to mirror it — see the deposit-claim path.
 
 import { randomUUID } from "node:crypto";
 import { passwordGrantAuth } from "./cbtc.mjs";
 
-const HOLDING_VIEW =
-  "#splice-api-token-holding-v1:Splice.Api.Token.HoldingV1:Holding";
+const HOLDING_VIEW = "#splice-api-token-holding-v1:Splice.Api.Token.HoldingV1:Holding";
 const TRANSFER_INSTRUCTION =
   "#splice-api-token-transfer-instruction-v1:Splice.Api.Token.TransferInstructionV1:TransferInstruction";
 
-export class Amulet {
+export class TokenParty {
   /**
    * @param {object} cfg
-   * @param {string} cfg.ledgerUrl   - participant JSON Ledger API v2 base
-   * @param {string} cfg.scanProxyUrl - validator scan-proxy base (Amulet registry)
-   * @param {string} cfg.userId      - ledger user that holds act-as on the pool
+   * @param {string} cfg.ledgerUrl - participant JSON Ledger API v2 base
+   * @param {string} cfg.registryUrl - base that serves the accept choice context
+   * @param {boolean} [cfg.registryAuthed] - send our bearer to the registry (Amulet: yes)
+   * @param {string} cfg.userId - ledger user that holds act-as on the pool
    * @param {() => Promise<string>} cfg.auth - bearer token supplier
-   * @param {string} [cfg.instrument] - instrument id, Amulet unless told otherwise
+   * @param {string} cfg.instrument - on-ledger instrument id ("Amulet" | "CBTC")
+   * @param {string} cfg.asset - Selkie's internal asset code this maps to ("CC" | "CBTC")
+   * @param {string} [cfg.label] - human name for logs and receipts
    */
-  constructor({ ledgerUrl, scanProxyUrl, userId, auth, instrument = "Amulet" }) {
+  constructor({ ledgerUrl, registryUrl, registryAuthed = false, userId, auth, instrument, asset, label }) {
     this.ledgerUrl = ledgerUrl.replace(/\/$/, "");
-    this.scanProxyUrl = scanProxyUrl.replace(/\/$/, "");
+    this.registryUrl = registryUrl.replace(/\/$/, "");
+    this.registryAuthed = registryAuthed;
     this.userId = userId;
     this.auth = auth;
     this.instrument = instrument;
+    this.asset = asset;
+    this.label = label ?? asset;
   }
 
   async ledger(path, body) {
@@ -51,14 +58,13 @@ export class Amulet {
     return text ? JSON.parse(text) : {};
   }
 
-  /** The Amulet registry (scan-proxy) needs our bearer token, unlike cBTC's. */
+  /** Choice contexts. Amulet's scan-proxy needs our bearer; cBTC's is public. */
   async registry(path, body) {
-    const res = await fetch(`${this.scanProxyUrl}${path}`, {
+    const headers = { "content-type": "application/json" };
+    if (this.registryAuthed) headers.authorization = `Bearer ${await this.auth()}`;
+    const res = await fetch(`${this.registryUrl}${path}`, {
       method: "POST",
-      headers: {
-        authorization: `Bearer ${await this.auth()}`,
-        "content-type": "application/json",
-      },
+      headers,
       body: JSON.stringify(body),
     });
     const text = await res.text();
@@ -94,7 +100,7 @@ export class Amulet {
       .map((ev) => ({ cid: ev.contractId, view: ev.interfaceViews?.[0]?.viewValue ?? {} }));
   }
 
-  /** CC transfers sent to `party` that nobody has accepted yet. */
+  /** Transfers of this instrument sent to `party` that nobody has accepted yet. */
   async pendingFor(party) {
     return (await this.#activeByInterface(party, TRANSFER_INSTRUCTION))
       .filter(
@@ -109,7 +115,7 @@ export class Amulet {
       }));
   }
 
-  /** Real CC owned by `party` (accepted deposits sit here as their reserve). */
+  /** Real, unlocked holdings of this instrument owned by `party`. */
   async holdingsFor(party) {
     const all = (await this.#activeByInterface(party, HOLDING_VIEW)).filter(
       (h) => h.view.instrumentId?.id === this.instrument && h.view.owner === party && !h.view.lock,
@@ -118,9 +124,10 @@ export class Amulet {
   }
 
   /**
-   * Accept one incoming CC transfer, acting as the receiving party. The scan
-   * proxy computes the choice context (the open mining round and the amulet
-   * rules), which we attach verbatim as disclosed contracts.
+   * Accept one incoming transfer, acting as the receiving party. The registry
+   * computes the choice context (transfer rules, instrument config, and the
+   * disclosed contracts our participant needs to validate), which we attach
+   * verbatim.
    */
   async acceptFor(party, cid) {
     const ctx = await this.registry(
@@ -138,7 +145,7 @@ export class Amulet {
           },
         },
       ],
-      commandId: `selkie-cc-${randomUUID()}`,
+      commandId: `selkie-accept-${randomUUID()}`,
       userId: this.userId,
       actAs: [party],
       readAs: [party],
@@ -149,38 +156,68 @@ export class Amulet {
 }
 
 /**
- * Derive the validator scan-proxy base from the participant ledger URL when it
- * is not given explicitly. The hackathon hosts follow one naming scheme:
- *   ledger-api-json.participant.<cluster>  ->  validator-api-http.validator.<cluster>
+ * Derive the validator scan-proxy base (Amulet's registry) from the participant
+ * ledger URL. The hackathon hosts follow one scheme:
+ *   ledger-api-json.participant.<cluster> -> validator-api-http.validator.<cluster>
  */
-function deriveScanProxy(ledgerUrl) {
+export function deriveScanProxy(ledgerUrl) {
   const host = ledgerUrl.replace(/^https?:\/\//, "").replace(/\/.*$/, "");
   if (!host.startsWith("ledger-api-json.participant.")) return null;
   const validatorHost = host.replace("ledger-api-json.participant.", "validator-api-http.validator.");
   return `https://${validatorHost}/api/validator/v0/scan-proxy`;
 }
 
-/**
- * Build the CC deposit client from the environment, reusing the same Keycloak
- * credentials as cBTC. Returns null when devnet auth is not configured, so the
- * app runs unchanged on LocalNet.
- */
-export function amuletFromEnv(env = process.env) {
+/** Shared devnet credentials for the token clients (same Keycloak user as cBTC). */
+function devnetAuth(env) {
   const ledgerUrl = env.SELKIE_CBTC_LEDGER;
   const tokenUrl = env.SELKIE_CBTC_TOKEN_URL;
   const clientId = env.SELKIE_CBTC_CLIENT_ID;
   const username = env.SELKIE_CBTC_USERNAME;
   const password = env.SELKIE_CBTC_PASSWORD;
   if (!ledgerUrl || !tokenUrl || !clientId || !username || !password) return null;
+  return {
+    ledgerUrl,
+    userId: env.SELKIE_CBTC_USER ?? env.SELKIE_CBTC_PARTY?.split("::")[0],
+    auth: passwordGrantAuth({ tokenUrl, clientId, username, password }),
+  };
+}
 
-  const scanProxyUrl = env.SELKIE_CC_SCAN_PROXY ?? deriveScanProxy(ledgerUrl);
-  if (!scanProxyUrl) {
+/**
+ * Canton Coin (Amulet) accepted at each handle's own party. Returns null when
+ * devnet auth is not configured, so the app runs unchanged on LocalNet.
+ */
+export function amuletParty(env = process.env) {
+  const base = devnetAuth(env);
+  if (!base) return null;
+  const registryUrl = env.SELKIE_CC_SCAN_PROXY ?? deriveScanProxy(base.ledgerUrl);
+  if (!registryUrl) {
     throw new Error("CC deposits need SELKIE_CC_SCAN_PROXY (could not derive it from the ledger URL)");
   }
-  return new Amulet({
-    ledgerUrl,
-    scanProxyUrl,
-    userId: env.SELKIE_CBTC_USER ?? env.SELKIE_CBTC_PARTY.split("::")[0],
-    auth: passwordGrantAuth({ tokenUrl, clientId, username, password }),
+  return new TokenParty({
+    ...base,
+    registryUrl,
+    registryAuthed: true,
+    instrument: "Amulet",
+    asset: "CC",
+    label: "Canton Coin",
+  });
+}
+
+/**
+ * cBTC accepted at each handle's own party, exactly like CC. The registry is
+ * the issuer's public endpoint, namespaced by the instrument admin.
+ */
+export function cbtcParty(env = process.env) {
+  const base = devnetAuth(env);
+  const registry = env.SELKIE_CBTC_REGISTRY;
+  const admin = env.SELKIE_CBTC_ADMIN;
+  if (!base || !registry || !admin) return null;
+  return new TokenParty({
+    ...base,
+    registryUrl: `${registry.replace(/\/$/, "")}/api/token-standard/v0/registrars/${admin}`,
+    registryAuthed: false,
+    instrument: "CBTC",
+    asset: "CBTC",
+    label: "cBTC",
   });
 }

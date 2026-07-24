@@ -61,3 +61,30 @@ export function timeAgo(iso: string): string {
   if (seconds < 86400) return `${Math.floor(seconds / units[1][0])}h ago`;
   return `${Math.floor(seconds / units[2][0])}d ago`;
 }
+
+/**
+ * A friendly day bucket for grouping activity: Today, Yesterday, the weekday
+ * within the last week, then a plain date (with the year once it's not this
+ * one). Compared by calendar day in local time, not by elapsed hours.
+ */
+export function dayLabel(iso: string): string {
+  const d = new Date(iso);
+  const now = new Date();
+  const startOfDay = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+  const days = Math.round((startOfDay(now) - startOfDay(d)) / 86_400_000);
+  if (days <= 0) return "Today";
+  if (days === 1) return "Yesterday";
+  if (days < 7) return d.toLocaleDateString("en-US", { weekday: "long" });
+  const sameYear = d.getFullYear() === now.getFullYear();
+  return d.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    ...(sameYear ? {} : { year: "numeric" }),
+  });
+}
+
+/** Stable calendar-day key (local) for grouping, e.g. "2026-6-24". */
+export function dayKey(iso: string): string {
+  const d = new Date(iso);
+  return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+}

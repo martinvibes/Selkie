@@ -8,12 +8,14 @@ import {
   ArrowUpRight,
   Check,
   CheckCircle2,
+  ChevronDown,
   Copy,
   HandCoins,
   Inbox,
   Link2,
   Lock,
   RefreshCw,
+  Search,
   Send,
   Sparkles,
 } from "lucide-react";
@@ -33,7 +35,7 @@ import {
   type Reserve,
   type SendResult,
 } from "../lib/api";
-import { ASSET_LABEL, counterparty, money, parseHandles, timeAgo } from "../lib/format";
+import { ASSET_LABEL, counterparty, dayKey, dayLabel, money, parseHandles, timeAgo } from "../lib/format";
 
 const TABS = [
   { id: "activity", label: "Activity", icon: <ActivityIcon size={19} /> },
@@ -203,13 +205,16 @@ function TokenGrid({
         </p>
       )}
 
-      {reserve?.active && (
+      {reserve?.active && reserve.holdings.some((h) => h.amount > 0) && (
         <p className="mt-4 flex items-center gap-2.5 border-t-2 border-pen/10 pt-4 text-[13px] font-medium text-pen/60">
           <span className="pulse-dot h-1.5 w-1.5 shrink-0 rounded-full bg-gold-deep" />
           <span>
-            cBTC backed by a live reserve on {reserve.network}:{" "}
+            Backed by real tokens at your own address on {reserve.network}:{" "}
             <span className="num font-bold text-pen/85">
-              {money(reserve.total)} {reserve.instrument}
+              {reserve.holdings
+                .filter((h) => h.amount > 0)
+                .map((h) => `${money(h.amount)} ${ASSET_LABEL[h.asset] ?? h.asset}`)
+                .join(" · ")}
             </span>{" "}
             on ledger · verified {timeAgo(reserve.asOf)}
           </span>
@@ -219,7 +224,78 @@ function TokenGrid({
   );
 }
 
+/** One line in the feed: direction, amount, who, and when. Links to its
+ *  receipt when the payment has an id. */
+function ActivityRow({ e }: { e: Activity }) {
+  const inbound = e.direction === "in";
+  const row = (
+    <>
+      <span
+        className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg border-2 border-pen ${
+          inbound ? "bg-[#e5f2d3] text-[#2f6d33]" : "bg-card-bright text-pen/60"
+        }`}
+      >
+        {inbound ? <ArrowDownLeft size={15} /> : <ArrowUpRight size={15} />}
+      </span>
+
+      <TokenIcon asset={e.asset} size={28} />
+
+      <div className="min-w-0 flex-1 leading-snug">
+        <p className="flex items-baseline gap-2">
+          <span className="num text-[15px] font-bold">
+            {inbound ? "+" : "−"}
+            {money(e.amount)}
+          </span>
+          <span className="text-[13px] font-semibold text-pen/50">
+            {ASSET_LABEL[e.asset] ?? e.asset}
+          </span>
+          {!inbound && e.onboarded && (
+            <span className="text-xs font-bold text-gold-ink">new wallet</span>
+          )}
+        </p>
+        <p className="truncate text-[13px] font-medium text-pen/50">
+          {inbound ? `from ${counterparty(e.from)}` : `to ${counterparty(e.to)}`}
+          {e.memo ? ` · ${e.memo}` : ""}
+        </p>
+      </div>
+
+      <span className="shrink-0 text-xs font-semibold text-pen/40">{timeAgo(e.ts)}</span>
+    </>
+  );
+
+  const tint = inbound ? "bg-[#f4ecd7]" : "";
+  return (
+    <li className="border-b-2 border-pen/10 last:border-0">
+      {e.id ? (
+        <Link
+          to={`/tx/${e.id}`}
+          className={`flex items-center gap-3.5 px-5 py-4 transition hover:bg-pen/[0.06] ${tint}`}
+        >
+          {row}
+        </Link>
+      ) : (
+        <div className={`flex items-center gap-3.5 px-5 py-4 ${tint}`}>{row}</div>
+      )}
+    </li>
+  );
+}
+
+const FEED_PAGE = 12;
+const DIR_FILTERS = [
+  ["all", "All"],
+  ["out", "Sent"],
+  ["in", "Received"],
+] as const;
+
 function ActivityFeed({ entries }: { entries: Activity[] }) {
+  const [query, setQuery] = useState("");
+  const [dir, setDir] = useState<"all" | "in" | "out">("all");
+  const [shown, setShown] = useState(FEED_PAGE);
+
+  // Narrowing the list resets how much of it we reveal, so a filtered result
+  // never starts already truncated behind a "show more".
+  useEffect(() => setShown(FEED_PAGE), [query, dir]);
+
   if (!entries.length) {
     return (
       <div className="chunk p-10 text-center">
@@ -232,62 +308,110 @@ function ActivityFeed({ entries }: { entries: Activity[] }) {
     );
   }
 
+  const needle = query.trim().toLowerCase();
+  const matches = entries
+    .filter((e) => {
+      if (dir !== "all" && e.direction !== dir) return false;
+      if (!needle) return true;
+      const who = (e.direction === "in" ? e.from : e.to) ?? "";
+      return who.toLowerCase().includes(needle) || (e.memo ?? "").toLowerCase().includes(needle);
+    })
+    // Newest first, defensively — grouping below assumes descending order.
+    .sort((a, b) => new Date(b.ts).getTime() - new Date(a.ts).getTime());
+
+  const visible = matches.slice(0, shown);
+  const remaining = matches.length - visible.length;
+
+  // Group the visible rows into contiguous day buckets (Today, Yesterday, …).
+  const groups: { key: string; label: string; items: Activity[] }[] = [];
+  for (const e of visible) {
+    const key = dayKey(e.ts);
+    const last = groups[groups.length - 1];
+    if (last?.key === key) last.items.push(e);
+    else groups.push({ key, label: dayLabel(e.ts), items: [e] });
+  }
+
+  // Search and filters only earn their space once there's enough to sift.
+  const showControls = entries.length > 6;
+
   return (
-    <ul className="chunk overflow-hidden">
-      {entries.map((e) => {
-        const inbound = e.direction === "in";
-        const row = (
-          <>
-            <span
-              className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg border-2 border-pen ${
-                inbound ? "bg-[#e5f2d3] text-[#2f6d33]" : "bg-card-bright text-pen/60"
-              }`}
-            >
-              {inbound ? <ArrowDownLeft size={15} /> : <ArrowUpRight size={15} />}
-            </span>
-
-            <TokenIcon asset={e.asset} size={28} />
-
-            <div className="min-w-0 flex-1 leading-snug">
-              <p className="flex items-baseline gap-2">
-                <span className="num text-[15px] font-bold">
-                  {inbound ? "+" : "−"}
-                  {money(e.amount)}
-                </span>
-                <span className="text-[13px] font-semibold text-pen/50">
-                  {ASSET_LABEL[e.asset] ?? e.asset}
-                </span>
-                {!inbound && e.onboarded && (
-                  <span className="text-xs font-bold text-gold-ink">new wallet</span>
-                )}
-              </p>
-              <p className="truncate text-[13px] font-medium text-pen/50">
-                {inbound ? `from ${counterparty(e.from)}` : `to ${counterparty(e.to)}`}
-                {e.memo ? ` · ${e.memo}` : ""}
-              </p>
-            </div>
-
-            <span className="shrink-0 text-xs font-semibold text-pen/40">{timeAgo(e.ts)}</span>
-          </>
-        );
-
-        const tint = inbound ? "bg-[#f4ecd7]" : "";
-        return (
-          <li key={e.id ?? `${e.ts}-${e.to}`} className="border-b-2 border-pen/10 last:border-0">
-            {e.id ? (
-              <Link
-                to={`/tx/${e.id}`}
-                className={`flex items-center gap-3.5 px-5 py-4 transition hover:bg-pen/[0.06] ${tint}`}
+    <div className="chunk overflow-hidden">
+      {showControls && (
+        <div className="flex flex-col gap-3 border-b-2 border-pen/10 p-3.5">
+          <div className="relative">
+            <Search
+              size={15}
+              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-pen/40"
+            />
+            <input
+              type="text"
+              value={query}
+              onChange={(ev) => setQuery(ev.target.value)}
+              placeholder="Search by name or note"
+              aria-label="Search payments"
+              className="field !h-11 pl-10 text-sm"
+            />
+          </div>
+          <div className="flex gap-2">
+            {DIR_FILTERS.map(([id, label]) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setDir(id)}
+                aria-pressed={dir === id}
+                className={`chip !h-9 !px-3.5 text-[13px] ${dir === id ? "chip-on" : ""}`}
               >
-                {row}
-              </Link>
-            ) : (
-              <div className={`flex items-center gap-3.5 px-5 py-4 ${tint}`}>{row}</div>
-            )}
-          </li>
-        );
-      })}
-    </ul>
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {matches.length === 0 ? (
+        <div className="p-10 text-center">
+          <span className="mx-auto grid h-12 w-12 place-items-center rounded-xl border-2 border-pen bg-card-bright text-pen/45">
+            <Search size={19} />
+          </span>
+          <p className="mt-4 font-bold">Nothing matches that.</p>
+          <button
+            type="button"
+            onClick={() => {
+              setQuery("");
+              setDir("all");
+            }}
+            className="mt-3 text-sm font-bold text-gold-ink underline-offset-2 hover:underline"
+          >
+            Clear search and filters
+          </button>
+        </div>
+      ) : (
+        <>
+          {groups.map((g) => (
+            <section key={g.key}>
+              <p className="border-b-2 border-pen/10 bg-pen/[0.03] px-5 py-2 text-[11px] font-bold uppercase tracking-wider text-pen/45">
+                {g.label}
+              </p>
+              <ul>
+                {g.items.map((e) => (
+                  <ActivityRow key={e.id ?? `${e.ts}-${e.to}`} e={e} />
+                ))}
+              </ul>
+            </section>
+          ))}
+          {remaining > 0 && (
+            <button
+              type="button"
+              onClick={() => setShown((n) => n + FEED_PAGE)}
+              className="flex w-full items-center justify-center gap-2 border-t-2 border-pen/10 px-5 py-3.5 text-sm font-bold text-pen/70 transition hover:bg-pen/[0.06]"
+            >
+              Show {Math.min(FEED_PAGE, remaining)} more
+              <ChevronDown size={15} />
+            </button>
+          )}
+        </>
+      )}
+    </div>
   );
 }
 
@@ -530,10 +654,10 @@ function DepositPanel({ me, onDone }: { me: Me; onDone: () => void }) {
   );
 
   const claim = useCallback(
-    async (includeUntagged = false, silent = false) => {
+    async (silent = false) => {
       setBusy(true);
       try {
-        const res = await api.claimDeposits(includeUntagged);
+        const res = await api.claimDeposits();
         setResult(res);
         if (res.claimed.length) {
           toast("success", `${summarizeClaim(res.claimed)} landed in your wallet.`);
@@ -551,12 +675,12 @@ function DepositPanel({ me, onDone }: { me: Me; onDone: () => void }) {
     [load, onDone, toast],
   );
 
-  // Open the tab, read the deposit config, and quietly accept any Canton Coin
-  // already sitting at your address so a transfer just shows up.
+  // Open the tab, read the deposit config, and quietly accept anything already
+  // sitting at your address so a transfer just shows up.
   useEffect(() => {
     let alive = true;
     void load().then((d) => {
-      if (alive && (d.cc?.pending?.length ?? 0) > 0) void claim(false, true);
+      if (alive && d.active && d.pending.length > 0) void claim(true);
     });
     return () => {
       alive = false;
@@ -573,130 +697,86 @@ function DepositPanel({ me, onDone }: { me: Me; onDone: () => void }) {
       </div>
     );
 
-  const ccAddress = info.cc?.address ?? me.address ?? null;
-  const ccWaiting = (info.cc?.pending ?? []).reduce((n, p) => n + p.amount, 0);
+  const address = info.active ? info.address : (me.address ?? null);
+  const waitingByAsset = new Map<string, number>();
+  if (info.active) {
+    for (const p of info.pending) waitingByAsset.set(p.asset, (waitingByAsset.get(p.asset) ?? 0) + p.amount);
+  }
+  const waiting = [...waitingByAsset];
+  const tokenList = info.active
+    ? info.assets.map((a) => ASSET_LABEL[a] ?? a).join(" or ")
+    : "";
 
   return (
     <div className="grid gap-6">
       <ReceiveCard me={me} />
 
-      {/* Canton Coin lands at your own party, so it is a personal address and
-          Selkie accepts it for you. This is the path most people will use. */}
-      {info.cc && ccAddress && (
+      {/* One personal Canton party receives every token, and Selkie accepts it
+          for you. No tags, no separate addresses: the party is the address. */}
+      {info.active && address && (
         <section className="chunk p-6 sm:p-7">
-          <p className="font-display text-lg font-bold">Fund with Canton Coin</p>
+          <p className="font-display text-lg font-bold">Fund your wallet</p>
           <p className="mt-2 text-sm font-medium text-pen/60">
-            Send CC from the Canton Coin Wallet, or any Canton wallet, to your address below. It
-            arrives at your own party and Selkie accepts it into your balance for you.
+            Send {tokenList} from the Canton Coin Wallet, or any Canton wallet, to your address
+            below. It arrives at your own party on {info.network} and Selkie accepts it into your
+            balance for you.
           </p>
           <div className="mt-5">
-            <CopyField label="Your Canton Coin address" value={ccAddress} />
+            <CopyField label={`Your Canton address on ${info.network}`} value={address} />
           </div>
-          {ccWaiting > 0 && (
+
+          {waiting.length > 0 && (
             <p className="mt-4 flex items-start gap-2.5 rounded-xl border-2 border-pen bg-[#eef6ec] px-4 py-3 text-[13px] font-semibold text-[#215c2f]">
               <ArrowDownLeft size={14} className="mt-0.5 shrink-0" />
               <span>
-                <span className="num font-bold">{money(ccWaiting)} CC</span> just arrived and is
-                being accepted into your wallet…
+                <span className="num font-bold">
+                  {waiting.map(([a, n]) => `${money(n)} ${ASSET_LABEL[a] ?? a}`).join(" · ")}
+                </span>{" "}
+                just arrived and is being accepted into your wallet…
               </span>
             </p>
           )}
+
           <p className="mt-4 flex items-start gap-2.5 border-t-2 border-pen/10 pt-4 text-[13px] font-medium text-pen/55">
             <Lock size={13} className="mt-0.5 shrink-0" />
             <span>
-              A Canton transfer waits on the ledger until it is accepted. Selkie does that for you
-              the moment you open this page, or when you tap below.
+              One address for every token. A Canton transfer waits on the ledger until it is
+              accepted; Selkie does that for you the moment you open this page, or when you tap below.
             </span>
           </p>
         </section>
       )}
 
-      {/* cBTC: a shared token-standard address, attributed by a handle tag. */}
       {info.active && (
         <section className="chunk p-6 sm:p-7">
-          <p className="font-display text-lg font-bold">
-            Fund with {ASSET_LABEL[info.instrument] ?? info.instrument}
+          <p className="font-display text-lg font-bold">Already sent something?</p>
+          <p className="mt-1 text-[13px] font-medium text-pen/55">
+            This reads the ledger for transfers waiting at your address and accepts them.
           </p>
-          <p className="mt-2 text-sm font-medium text-pen/60">
-            Send {ASSET_LABEL[info.instrument] ?? info.instrument} from any Canton wallet to the
-            address below. Selkie receives it for every handle at this one address, so the tag is
-            what tells it the money is yours. Put it in the transfer's metadata under{" "}
-            <code className="num font-bold text-pen/80">{info.tagKey}</code>.
-          </p>
+          <button onClick={() => claim()} disabled={busy} className="btn btn-gold mt-4 w-full">
+            {busy ? "Checking the ledger…" : "Check for deposits"}
+          </button>
 
-          <p className="mt-3 flex items-start gap-2.5 rounded-xl border-2 border-pen bg-[#f7ecd2] px-4 py-3 text-[13px] font-semibold text-gold-ink">
-            <AlertTriangle size={14} className="mt-0.5 shrink-0" />
-            <span>
-              This address is for {ASSET_LABEL[info.instrument] ?? info.instrument}. To fund with
-              Canton Coin, use your own address above instead.
-            </span>
-          </p>
-
-          {info.isOperator && (
-            <p className="mt-3 flex items-start gap-2.5 rounded-xl border-2 border-pen bg-[#fadfe3] px-4 py-3 text-[13px] font-semibold text-[#7c1d2c]">
-              <AlertTriangle size={14} className="mt-0.5 shrink-0" />
-              <span>
-                This address is your own Canton party, because you run the deposit party. Sending to
-                it from your own wallet moves money from you to you and changes nothing. Deposits
-                have to come from somebody else's party.
-              </span>
-            </p>
+          {result && (
+            <div className="mt-5">
+              {result.claimed.length ? (
+                <ResultNote title="Deposit settled on Canton">
+                  <p className="font-medium">
+                    <span className="num font-bold text-gold-ink">
+                      {summarizeClaim(result.claimed)}
+                    </span>{" "}
+                    is now in your wallet.
+                  </p>
+                </ResultNote>
+              ) : (
+                <p className="text-sm font-medium text-pen/55">
+                  Nothing waiting for you yet. A transfer can take a moment to reach the participant.
+                </p>
+              )}
+            </div>
           )}
-
-          <div className="mt-5 grid gap-4">
-            <CopyField label={`Address on ${info.network}`} value={info.address} />
-            <CopyField label="Your tag" value={info.tag} />
-          </div>
         </section>
       )}
-
-      <section className="chunk p-6 sm:p-7">
-        <p className="font-display text-lg font-bold">Already sent something?</p>
-        <p className="mt-1 text-[13px] font-medium text-pen/55">
-          This reads the ledger for transfers waiting at your address and accepts them.
-        </p>
-        <button onClick={() => claim()} disabled={busy} className="btn btn-gold mt-4 w-full">
-          {busy ? "Checking the ledger…" : "Check for deposits"}
-        </button>
-
-        {/* Faucet transfers name nobody. Only the handle running the deposit
-            party can take those, and only by saying so. */}
-        {info.active && info.isOperator && (
-          <button
-            onClick={() => claim(true)}
-            disabled={busy}
-            className="btn btn-dim btn-sm mt-3 w-full"
-          >
-            Also take untagged transfers (operator)
-          </button>
-        )}
-
-        {result && (
-          <div className="mt-5">
-            {result.claimed.length ? (
-              <ResultNote title="Deposit settled on Canton">
-                <p className="font-medium">
-                  <span className="num font-bold text-gold-ink">
-                    {summarizeClaim(result.claimed)}
-                  </span>{" "}
-                  is now in your wallet.
-                </p>
-              </ResultNote>
-            ) : (
-              <p className="text-sm font-medium text-pen/55">
-                Nothing waiting for you yet. A transfer can take a moment to reach the participant.
-              </p>
-            )}
-            {result.unattributed > 0 && (
-              <p className="mt-3 text-[13px] font-medium text-pen/55">
-                {result.unattributed} untagged{" "}
-                {result.unattributed === 1 ? "transfer is" : "transfers are"} also waiting. Those
-                name no handle, so Selkie will not assign them automatically.
-              </p>
-            )}
-          </div>
-        )}
-      </section>
     </div>
   );
 }

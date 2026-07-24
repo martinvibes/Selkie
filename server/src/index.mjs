@@ -6,12 +6,11 @@ import { randomBytes } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { dirname, join, resolve } from "node:path";
 import { ledgerFromEnv } from "../../bot/src/ledger.mjs";
-import { cbtcFromEnv } from "../../bot/src/cbtc.mjs";
-import { amuletFromEnv } from "../../bot/src/amulet.mjs";
+import { amuletParty, cbtcParty } from "../../bot/src/token.mjs";
 import { Wallet } from "../../bot/src/wallet.mjs";
 import { History } from "./history.mjs";
 import { createApp } from "./app.mjs";
-import { startCcSweeper } from "./sweeper.mjs";
+import { startSweeper } from "./sweeper.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 
@@ -20,9 +19,6 @@ const config = {
   sessionSecret: process.env.SELKIE_SESSION_SECRET ?? randomBytes(32).toString("hex"),
   secureCookies: process.env.SELKIE_SECURE_COOKIES === "1",
   devLogin: process.env.SELKIE_DEV_LOGIN === "1",
-  // Whoever runs the deposit party. Only this handle may claim a transfer
-  // that named no handle, because only they can know who it was meant for.
-  operatorHandle: process.env.SELKIE_OPERATOR_HANDLE ?? "",
   webRoot: resolve(process.env.SELKIE_WEB_ROOT ?? join(here, "../../web")),
   x: {
     clientId: process.env.X_CLIENT_ID ?? "",
@@ -61,24 +57,22 @@ const pool = process.env.SELKIE_PARTY_POOL === "1";
 const wallet = new Wallet({ ledger, operator, pool });
 const history = new History(process.env.SELKIE_HISTORY ?? join(here, "../../.data/history.jsonl"));
 
-// Throws on a half-configured setup: better no reserve than a wrong one.
-const cbtc = cbtcFromEnv();
-// Real Canton Coin deposits: accept Amulet transfers sent to a handle's own
-// party. Shares the cBTC devnet credentials, so it lights up on the same nodes.
-const amulet = amuletFromEnv();
+// Real token deposits: accept CC (Amulet) and cBTC transfers sent to a handle's
+// own party. Each factory returns null unless its devnet credentials are set, so
+// the app runs unchanged on LocalNet. Both share the same devnet node.
+const tokens = [amuletParty(), cbtcParty()].filter(Boolean);
 
-createApp({ wallet, config, history, cbtc, amulet }).listen(config.port, () => {
+createApp({ wallet, config, history, tokens }).listen(config.port, () => {
   console.log(`Selkie on http://localhost:${config.port}`);
   console.log(`  operator: ${operator}`);
   console.log(`  X login:  ${config.x.clientId ? "configured" : "not configured (set X_CLIENT_ID)"}`);
-  console.log(`  cBTC:     ${cbtc ? `live reserve on Canton devnet (${cbtc.party.slice(0, 24)}...)` : "local asset only"}`);
-  console.log(`  CC deposit: ${amulet ? "live (accept Canton Coin at each handle's party)" : "off"}`);
+  console.log(`  tokens:   ${tokens.length ? tokens.map((t) => t.asset).join(", ") + " (accepted at each handle's own party)" : "local assets only"}`);
   console.log(`  parties:  ${pool ? "pool (claim a pre-granted party per handle)" : "allocate per handle"}`);
   if (config.devLogin) console.log("  dev login: ENABLED at /auth/dev?handle=name");
 });
 
-// Accept incoming Canton Coin for every handle on a timer, so a deposit lands
-// on its own instead of waiting for someone to open the Deposit page.
+// Accept incoming tokens for every handle on a timer, so a deposit lands on its
+// own instead of waiting for someone to open the Deposit page.
 const sweepMs = Number(process.env.SELKIE_SWEEP_MS ?? 8_000);
-startCcSweeper({ wallet, amulet, history, intervalMs: sweepMs });
-if (amulet) console.log(`  CC sweep: every ${Math.round(sweepMs / 1000)}s`);
+startSweeper({ wallet, tokens, history, intervalMs: sweepMs });
+if (tokens.length) console.log(`  sweep:    every ${Math.round(sweepMs / 1000)}s`);

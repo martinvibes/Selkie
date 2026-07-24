@@ -62,46 +62,33 @@ export type PublicAccount = {
 };
 
 /**
- * Where outside money comes in. One shared Canton party receives for every
- * handle, so `tag` is what makes a transfer yours: senders put it in the
- * transfer's metadata under `tagKey`.
+ * Where outside money comes in. Every token now lands at your OWN Canton party,
+ * so there is a single personal address that receives both CC and cBTC, and
+ * `pending` is whatever is already waiting there, per asset.
  */
-/** Canton Coin arrives at your own party, so its address is personal. */
-export type CcDeposit = {
-  address: string;
-  pending: { amount: number; sender: string }[];
-};
-
 export type Deposit =
-  | { active: false; cc?: CcDeposit | null }
+  | { active: false }
   | {
       active: true;
       address: string;
       network: string;
-      instrument: string;
-      tagKey: string;
-      tag: string;
-      /** Runs the deposit party, so may claim transfers that named no handle. */
-      isOperator: boolean;
-      cc?: CcDeposit | null;
+      assets: string[];
+      pending: { asset: string; amount: number; sender: string }[];
     };
 
 export type DepositClaim = {
   claimed: { asset: string; amount: number; sender: string; updateId: string; id: string }[];
   total: number;
-  unattributed: number;
 };
 
+/** Your balance's real on-ledger backing: unlocked holdings at your own party. */
 export type Reserve =
   | { active: false }
   | {
       active: true;
-      instrument: string;
       network: string;
-      party: string;
-      total: number;
-      unlocked: number;
-      contracts: { cid: string; amount: number; locked: boolean }[];
+      address: string;
+      holdings: { asset: string; amount: number }[];
       asOf: string;
     };
 
@@ -138,11 +125,7 @@ export const api = {
 
   deposit: () => request<Deposit>("/api/deposit"),
 
-  claimDeposits: (includeUntagged = false) =>
-    request<DepositClaim>("/api/deposit/claim", {
-      method: "POST",
-      body: JSON.stringify({ includeUntagged }),
-    }),
+  claimDeposits: () => request<DepositClaim>("/api/deposit/claim", { method: "POST" }),
 
   requests: () => request<Requests>("/api/requests"),
 
