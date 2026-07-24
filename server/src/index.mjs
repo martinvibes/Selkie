@@ -6,7 +6,7 @@ import { randomBytes } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { dirname, join, resolve } from "node:path";
 import { ledgerFromEnv } from "../../bot/src/ledger.mjs";
-import { amuletParty, cbtcParty } from "../../bot/src/token.mjs";
+import { amuletParty, cbtcParty, cethParty } from "../../bot/src/token.mjs";
 import { Wallet } from "../../bot/src/wallet.mjs";
 import { History } from "./history.mjs";
 import { createApp } from "./app.mjs";
@@ -57,10 +57,10 @@ const pool = process.env.SELKIE_PARTY_POOL === "1";
 const wallet = new Wallet({ ledger, operator, pool });
 const history = new History(process.env.SELKIE_HISTORY ?? join(here, "../../.data/history.jsonl"));
 
-// Real token deposits: accept CC (Amulet) and cBTC transfers sent to a handle's
-// own party. Each factory returns null unless its devnet credentials are set, so
-// the app runs unchanged on LocalNet. Both share the same devnet node.
-const tokens = [amuletParty(), cbtcParty()].filter(Boolean);
+// Real token deposits: accept CC (Amulet), cBTC and cETH transfers sent to a
+// handle's own party. Each factory returns null unless its devnet credentials
+// are set, so the app runs unchanged on LocalNet. All share the same devnet node.
+const tokens = [amuletParty(), cbtcParty(), cethParty()].filter(Boolean);
 
 createApp({ wallet, config, history, tokens }).listen(config.port, () => {
   console.log(`Selkie on http://localhost:${config.port}`);

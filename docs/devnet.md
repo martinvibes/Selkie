@@ -63,6 +63,11 @@ export SELKIE_CBTC_TOKEN_URL=...  # Keycloak token endpoint
 export SELKIE_CBTC_CLIENT_ID=...  # OIDC client (password grant)
 export SELKIE_CBTC_USERNAME=...
 export SELKIE_CBTC_PASSWORD=...
+
+# cETH rides the same ledger, auth and registry host as cBTC, under its own
+# registrar. Only the admin party differs; the rest is reused.
+export SELKIE_CETH_ADMIN=...      # cETH instrument admin (rails-cethMain-1-dev::...)
+export SELKIE_CETH_REGISTRY=...   # optional; defaults to SELKIE_CBTC_REGISTRY
 ```
 
 Auth is a resource-owner-password grant against the validator's Keycloak;

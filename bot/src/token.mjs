@@ -221,3 +221,25 @@ export function cbtcParty(env = process.env) {
     label: "cBTC",
   });
 }
+
+/**
+ * cETH accepted at each handle's own party, exactly like cBTC. It rides the same
+ * DA-Utility registry host but under its own registrar admin (rails-cethMain),
+ * and its on-ledger instrument id is lowercase "cETH" while Selkie's internal
+ * asset code is "CETH". Registry defaults to the cBTC one since it is the same
+ * host; only the admin differs.
+ */
+export function cethParty(env = process.env) {
+  const base = devnetAuth(env);
+  const registry = env.SELKIE_CETH_REGISTRY ?? env.SELKIE_CBTC_REGISTRY;
+  const admin = env.SELKIE_CETH_ADMIN;
+  if (!base || !registry || !admin) return null;
+  return new TokenParty({
+    ...base,
+    registryUrl: `${registry.replace(/\/$/, "")}/api/token-standard/v0/registrars/${admin}`,
+    registryAuthed: false,
+    instrument: "cETH",
+    asset: "CETH",
+    label: "cETH",
+  });
+}

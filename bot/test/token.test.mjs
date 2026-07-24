@@ -7,7 +7,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { TokenParty, amuletParty, cbtcParty } from "../src/token.mjs";
+import { TokenParty, amuletParty, cbtcParty, cethParty } from "../src/token.mjs";
 
 const TI = "#splice-api-token-transfer-instruction-v1:Splice.Api.Token.TransferInstructionV1:TransferInstruction";
 const PARTY = "selkie-pool-10::12200abc";
@@ -139,7 +139,31 @@ test("cbtcParty points at the issuer registrar and maps CBTC -> CBTC, public", (
   );
 });
 
-test("both factories are null when devnet auth is absent", () => {
+test("cethParty rides the cBTC registry host under its own admin, id lowercase cETH", () => {
+  const env = {
+    SELKIE_CBTC_LEDGER: "https://ledger-api-json.participant.hackcanton-01.devnet.naas.noders.services",
+    SELKIE_CBTC_TOKEN_URL: "https://kc/token",
+    SELKIE_CBTC_CLIENT_ID: "client",
+    SELKIE_CBTC_USERNAME: "u",
+    SELKIE_CBTC_PASSWORD: "p",
+    SELKIE_CBTC_PARTY: "op::1220",
+    SELKIE_CBTC_REGISTRY: "https://api.utilities.digitalasset-dev.com",
+    SELKIE_CETH_ADMIN: "rails-cethMain-1-dev::1220b6",
+  };
+  const c = cethParty(env);
+  assert.equal(c.instrument, "cETH", "on-ledger instrument id is lowercase");
+  assert.equal(c.asset, "CETH", "Selkie's internal asset code stays uppercase");
+  assert.equal(c.registryAuthed, false);
+  assert.equal(
+    c.registryUrl,
+    "https://api.utilities.digitalasset-dev.com/api/token-standard/v0/registrars/rails-cethMain-1-dev::1220b6",
+  );
+  // Falls back to the cBTC registry host, but needs its own admin.
+  assert.equal(cethParty({ ...env, SELKIE_CETH_ADMIN: undefined }), null);
+});
+
+test("all factories are null when devnet auth is absent", () => {
   assert.equal(amuletParty({}), null);
   assert.equal(cbtcParty({}), null);
+  assert.equal(cethParty({}), null);
 });
