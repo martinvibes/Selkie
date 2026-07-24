@@ -5,9 +5,12 @@
 // With no operator party configured it allocates one and prints it, so a fresh
 // sandbox is one command away from a working bot.
 
+import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
 import { ledgerFromEnv } from "./ledger.mjs";
 import { Wallet } from "./wallet.mjs";
 import { TelegramBot } from "./telegram.mjs";
+import { History } from "../../server/src/history.mjs";
 
 const cfg = {
   pkgId: process.env.SELKIE_PKG_ID,
@@ -45,7 +48,14 @@ if (!cfg.telegramToken) {
   process.exit(1);
 }
 
-const bot = new TelegramBot({ token: cfg.telegramToken, wallet });
+// Telegram handles are their own wallet namespace, so they get their own
+// activity log, separate from the web app's history.jsonl. Same gitignored
+// .data/ dir; path is module-relative so it's independent of the launch cwd.
+const here = dirname(fileURLToPath(import.meta.url));
+const historyPath = process.env.SELKIE_TG_HISTORY ?? join(here, "../../.data/tg-history.jsonl");
+const history = new History(historyPath);
+
+const bot = new TelegramBot({ token: cfg.telegramToken, wallet, history });
 process.on("SIGINT", () => {
   bot.stop();
   process.exit(0);

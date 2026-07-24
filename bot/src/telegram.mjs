@@ -3,29 +3,28 @@
 // Telegram is the demo-safe twin of the X worker — same parser, same dispatch,
 // same ledger — so a judge can watch real Canton contracts move in a chat
 // without us depending on X API approval. Beyond the shared commands it adds
-// the chat-native bits: a /start that opens a wallet, a tap menu, and copy
-// buttons for your handle and your Canton address.
+// the chat-native bits: a /start that opens a wallet, a persistent nav bar,
+// copy buttons for your handle and address, and tap-to-pay on requests.
 
-import { handleCommand, HELP } from "./dispatch.mjs";
+import { handleCommand, formatRequests, HELP, fmt, label } from "./dispatch.mjs";
 import { normalizeHandle } from "./wallet.mjs";
 
-// The tap menu under a reply. Emoji are functional labels, not decoration.
-const MENU = {
-  inline_keyboard: [
-    [
-      { text: "💰 Balance", callback_data: "balance" },
-      { text: "📥 Receive", callback_data: "receive" },
-    ],
-    [
-      { text: "📨 Requests", callback_data: "requests" },
-      { text: "❔ Help", callback_data: "help" },
-    ],
+// Persistent bottom bar. Each button just sends its text; onUpdate strips the
+// leading emoji so "💰 Balance" routes exactly like typing "balance". One tap
+// to anywhere is the whole point — no scrolling back for a menu.
+const NAV = {
+  keyboard: [
+    [{ text: "💰 Balance" }, { text: "📥 Receive" }],
+    [{ text: "📨 Requests" }, { text: "🧾 History" }],
+    [{ text: "❔ Help" }],
   ],
+  resize_keyboard: true,
+  is_persistent: true,
 };
 
 // Two ways to share who you are: your handle and your address. copy_text
 // buttons (Bot API 7.11) drop the value straight on the clipboard; the values
-// are also in the message body so older clients can long-press to copy.
+// are also in the message body (inside <code>) so any client can tap to copy.
 const receiveKeyboard = (handle, address) => ({
   inline_keyboard: [
     [{ text: `Copy ${handle}`, copy_text: { text: handle } }],
@@ -33,16 +32,22 @@ const receiveKeyboard = (handle, address) => ({
   ],
 });
 
+// Reply-keyboard buttons arrive with their emoji; a message can also just open
+// with one. Strip a leading run of emoji/spaces so routing sees the word.
+const LEAD_EMOJI = /^[\s\p{Extended_Pictographic}️‍]+/u;
+
 export class TelegramBot {
   /**
    * @param {object} cfg
    * @param {string} cfg.token   - BotFather token
    * @param {import("./wallet.mjs").Wallet} cfg.wallet
+   * @param {import("../../server/src/history.mjs").History} [cfg.history]
    * @param {(msg: string) => void} [cfg.log]
    */
-  constructor({ token, wallet, log = console.log }) {
+  constructor({ token, wallet, history = null, log = console.log }) {
     this.token = token;
     this.wallet = wallet;
+    this.history = history;
     this.log = log;
     this.api = `https://api.telegram.org/bot${token}`;
     this.offset = 0;
@@ -61,9 +66,15 @@ export class TelegramBot {
   }
 
   send(chatId, text, extra = {}) {
-    // Plain text on purpose: handles like @fan_1 are Markdown italics triggers,
-    // and a reply that fails to parse is a reply the user never gets.
-    return this.call("sendMessage", { chat_id: chatId, text, ...extra });
+    // HTML on purpose: <b>/<code> give the replies structure, and unlike
+    // Markdown it never trips over an @handle. Dispatch escapes user memos.
+    return this.call("sendMessage", {
+      chat_id: chatId,
+      text,
+      parse_mode: "HTML",
+      disable_web_page_preview: true,
+      ...extra,
+    });
   }
 
   answerCallback(id, text) {
@@ -97,25 +108,49 @@ export class TelegramBot {
       return;
     }
 
-    // Telegram-isms collapse into the shared grammar: "/send@selkiepay_bot
-    // 5 CC to @ada" and "send 5 CC to @ada" must mean the same thing.
-    const text = msg.text.replace(/@\w*bot\b/gi, " ").replace(/^\//, "").trim();
+    // Collapse Telegram-isms into the shared grammar: strip the @bot mention,
+    // a tapped button's leading emoji, and a leading slash, so
+    // "/send@selkiepay_bot 5 CC to @ada", "💰 Balance" and "balance" all land.
+    const text = msg.text
+      .replace(/@\w*bot\b/gi, " ")
+      .replace(LEAD_EMOJI, "")
+      .replace(/^\//, "")
+      .trim();
     const word = text.toLowerCase();
+    const priv = msg.chat.type === "private";
 
-    // Chat-native commands the shared parser has no reply shape for.
+    // Chat-native views the shared parser has no reply shape for.
     if (word === "start" || word === "") return this.onStart(msg.chat.id, username);
-    if (["receive", "address", "deposit"].includes(word)) return this.onReceive(msg.chat.id, username);
-    if (word === "menu" || word === "help") return this.send(msg.chat.id, HELP, { reply_markup: MENU });
+    if (["receive", "address", "deposit", "get paid"].includes(word)) return this.onReceive(msg.chat.id, username);
+    if (word === "requests") return this.onRequests(msg.chat.id, username);
+    if (word === "menu" || word === "help") return this.send(msg.chat.id, HELP, priv ? { reply_markup: NAV } : {});
 
     // Everything else is a real command: parsed, run on the ledger, replied.
-    const reply = await handleCommand({ wallet: this.wallet, from: username, text, platform: "telegram" });
-    if (reply) await this.send(msg.chat.id, reply);
-    // A DM never goes unanswered: anything unparsed gets the menu. Groups stay
-    // quiet so the bot never spams a conversation.
-    else if (msg.chat.type === "private") await this.send(msg.chat.id, HELP, { reply_markup: MENU });
+    const reply = await handleCommand({
+      wallet: this.wallet,
+      from: username,
+      text,
+      platform: "telegram",
+      history: this.history,
+    });
+    if (reply) {
+      await this.send(msg.chat.id, reply, priv ? { reply_markup: NAV } : {});
+    } else if (priv) {
+      // A DM never goes unanswered. Near-miss verbs get a focused nudge; the
+      // rest get the organised help. Groups stay quiet so we never spam.
+      await this.send(msg.chat.id, this.hint(word), { reply_markup: NAV });
+    }
   }
 
-  /** A tapped menu button. */
+  /** A focused example for a half-typed command, else the full help. */
+  hint(word) {
+    const verb = word.split(/\s+/)[0];
+    if (verb === "send" || verb === "pay") return "To send: <code>send 5 CC to @ada</code>";
+    if (verb === "request" || verb === "ask") return "To request: <code>request 10 CC from @ada</code>";
+    return HELP;
+  }
+
+  /** A tapped button on a message (approve/decline on a request). */
   async onCallback(cq) {
     const chatId = cq.message?.chat?.id;
     const username = cq.from?.username;
@@ -124,18 +159,16 @@ export class TelegramBot {
         await this.answerCallback(cq.id, "Set a Telegram username first.");
         return;
       }
-      if (cq.data === "receive") {
-        await this.onReceive(chatId, username);
-      } else if (cq.data === "help") {
-        await this.send(chatId, HELP, { reply_markup: MENU });
-      } else if (cq.data === "balance" || cq.data === "requests") {
+      const [verb, handle] = String(cq.data ?? "").split(":");
+      if ((verb === "approve" || verb === "decline") && handle) {
         const reply = await handleCommand({
           wallet: this.wallet,
           from: username,
-          text: cq.data,
+          text: `${verb} @${handle}`,
           platform: "telegram",
+          history: this.history,
         });
-        await this.send(chatId, reply ?? HELP, { reply_markup: MENU });
+        if (reply) await this.send(chatId, reply, { reply_markup: NAV });
       }
       await this.answerCallback(cq.id);
     } catch (err) {
@@ -155,23 +188,40 @@ export class TelegramBot {
         return this.send(
           chatId,
           "Selkie is at capacity on this test network — new wallets are on hold while we add more. Check back shortly.",
+          { reply_markup: NAV },
         );
       }
       throw err;
     }
-    const text = [
-      `Welcome to Selkie, ${handle}.`,
+
+    // New vs returning off the account alone is wrong: someone paid before they
+    // ever opened the bot has an account too. Read the balance and greet to fit.
+    let funded = false;
+    try {
+      funded = Object.values(await this.wallet.balance(username, "telegram")).some((v) => v > 0);
+    } catch {
+      /* balance is a nicety here, never a reason to fail /start */
+    }
+
+    const lines = [`<b>Welcome to Selkie, ${handle}</b>`, ""];
+    if (account.created) {
+      lines.push("Your private wallet is ready.");
+    } else if (funded) {
+      lines.push("Welcome back. You've got a balance waiting. Tap 💰 Balance to see it.");
+    } else {
+      lines.push("Welcome back.");
+    }
+    lines.push(
       "",
-      account.created ? "Your private wallet is ready." : "Welcome back — your wallet is right here.",
-      "Your handle is your wallet. People can pay you just by your @username, and nobody sees your balance but you.",
+      "Your @handle is your wallet. People pay you by your username, and nobody sees your balance but you.",
       "",
-      "Try one:",
-      "  send 5 CC to @ada",
-      "  balance",
+      "<b>Try one</b>",
+      "<code>send 5 CC to @ada</code>",
+      "<code>balance</code>",
       "",
       "No app, no seed phrase, no gas.",
-    ].join("\n");
-    await this.send(chatId, text, { reply_markup: MENU });
+    );
+    await this.send(chatId, lines.join("\n"), { reply_markup: NAV });
   }
 
   /** Receive: your handle and address, with buttons that copy each. */
@@ -182,19 +232,42 @@ export class TelegramBot {
       account = await this.wallet.ensureAccount(username, "telegram");
     } catch (err) {
       if (err.code === "POOL_EXHAUSTED") {
-        return this.send(chatId, "Selkie is at capacity on this test network. New wallets are on hold.");
+        return this.send(chatId, "Selkie is at capacity on this test network. New wallets are on hold.", {
+          reply_markup: NAV,
+        });
       }
       throw err;
     }
     const text = [
-      "Get paid",
+      "<b>Get paid</b>",
       "",
-      `Your handle:  ${handle}`,
-      `Your address: ${account.owner}`,
+      `Handle   <code>${handle}</code>`,
+      `Address  <code>${account.owner}</code>`,
       "",
-      "People on Selkie pay you by your handle. Use the address to receive from a wallet elsewhere on Canton.",
+      "On Selkie, people pay you by your handle. Use the address to receive from a wallet elsewhere on Canton.",
     ].join("\n");
     await this.send(chatId, text, { reply_markup: receiveKeyboard(handle, account.owner) });
+  }
+
+  /** Requests: the list, plus a tap-to-pay button for each one owed. */
+  async onRequests(chatId, username) {
+    let incoming = [];
+    let outgoing = [];
+    try {
+      ({ incoming, outgoing } = await this.wallet.requests(username, "telegram"));
+    } catch (err) {
+      return this.send(chatId, `Couldn't load your requests: ${err.message}`, { reply_markup: NAV });
+    }
+    const text = formatRequests(incoming, outgoing);
+    const rows = incoming.slice(0, 6).map((r) => {
+      const h = r.from.replace(/^@/, "");
+      return [
+        { text: `Pay ${r.from} ${fmt(r.amount)} ${label(r.asset)}`, callback_data: `approve:${h}` },
+        { text: "Decline", callback_data: `decline:${h}` },
+      ];
+    });
+    const extra = rows.length ? { reply_markup: { inline_keyboard: rows } } : { reply_markup: NAV };
+    await this.send(chatId, text, extra);
   }
 
   async start() {

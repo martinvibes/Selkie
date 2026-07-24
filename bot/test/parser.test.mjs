@@ -42,6 +42,11 @@ test("balance", () => {
   assert.deepEqual(parseCommand("@SelkiePay balance"), { type: "balance" });
 });
 
+test("history and its activity alias", () => {
+  assert.deepEqual(parseCommand("history"), { type: "history" });
+  assert.deepEqual(parseCommand("activity"), { type: "history" });
+});
+
 test("unknown asset rejected", () => {
   assert.equal(parseCommand("send 5 DOGE to @lan").type, "error");
 });

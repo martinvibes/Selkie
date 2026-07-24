@@ -60,6 +60,13 @@ const RULES = [
     re: /\bbalance\b/i,
     map: () => ({}),
   },
+  {
+    // "history" / "activity" both open the activity log. Standalone words, so
+    // they can't collide with the money-moving rules above.
+    type: "history",
+    re: /\b(?:history|activity)\b/i,
+    map: () => ({}),
+  },
 ];
 
 /**
