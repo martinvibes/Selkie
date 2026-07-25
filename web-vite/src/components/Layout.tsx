@@ -184,6 +184,19 @@ export function Footer() {
             <Mark size={18} />
             <span className="font-display font-bold text-ivory/85">Selkie</span>
           </span>
+          <nav className="flex items-center gap-6">
+            <Link to="/docs" className="font-semibold transition-colors hover:text-ivory">
+              Docs
+            </Link>
+            <a
+              href="https://github.com/martinvibes/Selkie"
+              target="_blank"
+              rel="noreferrer"
+              className="font-semibold transition-colors hover:text-ivory"
+            >
+              GitHub
+            </a>
+          </nav>
           <span>Private payments on Canton · HackCanton S2</span>
         </div>
       </Shell>

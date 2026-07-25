@@ -263,6 +263,12 @@ export function Home() {
                   <a href="#how" className="btn btn-dim">
                     How it works
                   </a>
+                  <Link
+                    to="/docs"
+                    className="text-sm font-semibold text-ivory/70 underline-offset-4 hover:text-ivory hover:underline"
+                  >
+                    Read the docs
+                  </Link>
                 </div>
 
                 {loginUnavailable && !me && (

@@ -230,6 +230,15 @@
     background: var(--card-bright);
   }
 
+  /* Dark button: for a call to action sitting on a gold surface. */
+  .btn-dark {
+    color: #f4f1ea;
+    background: var(--pen);
+  }
+  .btn-dark:hover {
+    filter: brightness(1.18);
+  }
+
   /* ---------- fields ---------- */
   .field {
     width: 100%;

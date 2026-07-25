@@ -6,6 +6,7 @@ import { Home } from "./pages/Home";
 import { Dashboard } from "./pages/Dashboard";
 import { Account } from "./pages/Account";
 import { TransactionDetail } from "./pages/TransactionDetail";
+import { Docs } from "./pages/Docs";
 
 export default function App() {
   return (
@@ -15,6 +16,9 @@ export default function App() {
         <BrowserRouter>
         <Routes>
           <Route path="/" element={<Home />} />
+
+          {/* Everything the wallet can do, and how it works. */}
+          <Route path="/docs" element={<Docs />} />
 
           {/* Your wallet, tabbed. */}
           <Route path="/dashboard" element={<Navigate to="/dashboard/activity" replace />} />
