@@ -36,6 +36,22 @@ const receiveKeyboard = (handle, address) => ({
 // with one. Strip a leading run of emoji/spaces so routing sees the word.
 const LEAD_EMOJI = /^[\s\p{Extended_Pictographic}️‍]+/u;
 
+// The "/" slash-command menu, registered with Telegram on startup so it always
+// matches what the bot actually does. Descriptions carry the how-to inline;
+// /help has the full guide. Order is by how often it's reached for.
+const COMMANDS = [
+  { command: "balance", description: "Show your private balance" },
+  { command: "send", description: "Send tokens. Example: send 5 CC to @handle" },
+  { command: "receive", description: "Your handle and Canton address to get paid" },
+  { command: "request", description: "Ask someone to pay you. Example: request 10 CC from @handle" },
+  { command: "requests", description: "See who is waiting on you" },
+  { command: "approve", description: "Pay a request. Example: approve @handle" },
+  { command: "decline", description: "Turn down a request. Example: decline @handle" },
+  { command: "history", description: "Your recent activity" },
+  { command: "help", description: "What Selkie can do and how to use it" },
+  { command: "start", description: "Open your wallet and get started" },
+];
+
 export class TelegramBot {
   /**
    * @param {object} cfg
@@ -270,9 +286,15 @@ export class TelegramBot {
     await this.send(chatId, text, extra);
   }
 
+  /** Publish the "/" command menu. Idempotent, so it's safe on every boot. */
+  registerCommands() {
+    return this.call("setMyCommands", { commands: COMMANDS });
+  }
+
   async start() {
     this.running = true;
     const me = await this.call("getMe", {});
+    await this.registerCommands().catch((err) => this.log(`setMyCommands failed: ${err.message}`));
     this.log(`Selkie bot live as @${me.username}`);
     while (this.running) {
       try {
