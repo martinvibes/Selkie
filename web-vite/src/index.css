@@ -323,6 +323,47 @@
       0 8px 22px -8px rgba(217, 168, 92, 0.5);
   }
 
+  /* ---------- segmented toggle (send: handle | address) ---------- */
+  .seg {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.3rem;
+    padding: 0.3rem;
+    border-radius: 0.85rem;
+    border: 2px solid var(--pen);
+    background: var(--card-bright);
+    box-shadow: 0.14rem 0.18rem 0 var(--shadow);
+  }
+  .seg-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    height: 2.4rem;
+    border-radius: 0.6rem;
+    border: none;
+    background: transparent;
+    color: rgba(19, 26, 33, 0.6);
+    font-size: 0.875rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition:
+      background-color 150ms ease,
+      color 150ms ease,
+      box-shadow 150ms ease;
+  }
+  .seg-btn:hover {
+    color: var(--pen);
+  }
+  .seg-on,
+  .seg-on:hover {
+    background: linear-gradient(180deg, #f9e8b6, #e5bd77 60%, #d5a45d);
+    color: var(--pen);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.5),
+      0 6px 16px -8px rgba(217, 168, 92, 0.55);
+  }
+
   /* ---------- the floating rail (dashboard nav) ---------- */
   .rail-sq {
     position: relative;

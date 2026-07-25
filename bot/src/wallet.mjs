@@ -350,8 +350,24 @@ export class Wallet {
       err.code = "NO_SENDER_WALLET";
       throw err;
     }
-    const recipient = await this.ensureAccount(to, platform);
-    if (recipient.owner === sender.owner) throw new Error("cannot send to yourself");
+    // "to" is either a social handle or a raw Canton party id. A party id
+    // always carries the "namespace::fingerprint" separator a handle never can,
+    // so it's an unambiguous switch. Address sends stay inside Selkie: they
+    // resolve to the wallet that already owns that party, so the transfer is the
+    // same instant, private settlement — just addressed the on-ledger way.
+    let recipient;
+    if (to.includes("::")) {
+      recipient = await this.accountByParty(to);
+      if (!recipient) {
+        const err = new Error("that address isn't a Selkie wallet");
+        err.code = "UNKNOWN_ADDRESS";
+        throw err;
+      }
+      recipient.created = false;
+    } else {
+      recipient = await this.ensureAccount(to, platform);
+    }
+    if (recipient.owner === sender.owner) throw new Error("cannot send to your own address");
 
     const holdingCid = await this.fundingHolding(from, asset, value, platform);
 

@@ -6,10 +6,12 @@ import {
   ArrowDownLeft,
   ArrowDownToLine,
   ArrowUpRight,
+  AtSign,
   Check,
   CheckCircle2,
   ChevronDown,
   Copy,
+  Fingerprint,
   HandCoins,
   Inbox,
   Link2,
@@ -444,7 +446,9 @@ function SendPanel({
   presetTo?: string;
   onDone: () => void;
 }) {
+  const [mode, setMode] = useState<"handle" | "address">("handle");
   const [to, setTo] = useState(presetTo ?? "");
+  const [addr, setAddr] = useState("");
   const [amount, setAmount] = useState("");
   const [asset, setAsset] = useState(assets[0] ?? "CC");
   const [memo, setMemo] = useState("");
@@ -457,15 +461,28 @@ function SendPanel({
     event.preventDefault();
     setError(null);
     const value = Number(amount);
-    if (!to.trim()) return setError("Who are you sending to?");
+
+    // Each mode resolves the recipient a different way: a handle is a name we
+    // look up, an address is the Canton party id itself. A party id always has
+    // the "::" namespace separator, so we can sanity-check it before the ledger.
+    let recipient: string;
+    if (mode === "address") {
+      recipient = addr.trim();
+      if (!recipient) return setError("Paste the Canton address you're sending to.");
+      if (!recipient.includes("::")) return setError("That doesn't look like a Canton address.");
+    } else {
+      recipient = to.replace(/^@+/, "").trim();
+      if (!recipient) return setError("Who are you sending to?");
+    }
     if (!(value > 0)) return setError("Enter an amount greater than zero.");
 
     setBusy(true);
     try {
-      const res = await api.send({ to: to.replace(/^@+/, "").trim(), asset, amount: value, memo });
+      const res = await api.send({ to: recipient, asset, amount: value, memo });
       setResult(res);
       toast("success", `Sent ${money(res.amount)} ${ASSET_LABEL[res.asset] ?? res.asset} to ${res.to}`);
       setTo("");
+      setAddr("");
       setAmount("");
       setMemo("");
       onDone();
@@ -478,25 +495,74 @@ function SendPanel({
 
   return (
     <form onSubmit={submit} className="chunk grid gap-5 p-6 sm:p-7">
-      <div className="grid gap-2">
-        <label className="label" htmlFor="to">
-          To
-        </label>
-        <div className="relative flex items-center">
-          <span className="pointer-events-none absolute left-4 font-semibold text-pen/40">@</span>
-          <input
-            id="to"
-            className="field pl-9"
-            value={to}
-            onChange={(e) => setTo(e.target.value)}
-            placeholder="handle"
-            autoComplete="off"
-            spellCheck={false}
-          />
+      <div className="grid gap-2.5">
+        <span className="label">To</span>
+
+        {/* One recipient, two ways to name them. A segmented switch keeps the
+            form to a single input that morphs, instead of two rival fields. */}
+        <div className="seg" role="tablist" aria-label="Send to a handle or a Canton address">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={mode === "handle"}
+            className={`seg-btn ${mode === "handle" ? "seg-on" : ""}`}
+            onClick={() => {
+              setMode("handle");
+              setError(null);
+            }}
+          >
+            <AtSign size={15} /> Handle
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={mode === "address"}
+            className={`seg-btn ${mode === "address" ? "seg-on" : ""}`}
+            onClick={() => {
+              setMode("address");
+              setError(null);
+            }}
+          >
+            <Fingerprint size={15} /> Address
+          </button>
         </div>
-        <p className="text-[13px] font-medium text-pen/50">
-          They don't need an account. If they've never used Selkie, this creates their wallet.
-        </p>
+
+        {mode === "handle" ? (
+          <>
+            <div className="relative flex items-center">
+              <span className="pointer-events-none absolute left-4 font-semibold text-pen/40">@</span>
+              <input
+                id="to"
+                className="field pl-9"
+                value={to}
+                onChange={(e) => setTo(e.target.value)}
+                placeholder="handle"
+                autoComplete="off"
+                spellCheck={false}
+              />
+            </div>
+            <p className="text-[13px] font-medium text-pen/50">
+              They don't need an account. If they've never used Selkie, this creates their wallet.
+            </p>
+          </>
+        ) : (
+          <>
+            <textarea
+              id="addr"
+              className="field num min-h-[3.5rem] resize-none break-all py-2.5 text-sm leading-snug"
+              value={addr}
+              onChange={(e) => setAddr(e.target.value)}
+              placeholder="party::fingerprint"
+              autoComplete="off"
+              spellCheck={false}
+              rows={2}
+            />
+            <p className="text-[13px] font-medium text-pen/50">
+              Paste a Selkie Canton address. It settles straight to that wallet on-ledger, private
+              and instant.
+            </p>
+          </>
+        )}
       </div>
 
       <div className="grid gap-2">
