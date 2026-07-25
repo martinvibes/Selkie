@@ -494,8 +494,8 @@ function SendPanel({
   }
 
   return (
-    <form onSubmit={submit} className="chunk grid gap-5 p-6 sm:p-7">
-      <div className="grid gap-2.5">
+    <form onSubmit={submit} className="chunk grid min-w-0 gap-5 p-6 sm:p-7">
+      <div className="grid min-w-0 gap-2.5">
         <span className="label">To</span>
 
         {/* One recipient, two ways to name them. A segmented switch keeps the
@@ -608,13 +608,13 @@ function SendPanel({
 
       {result && (
         <ResultNote title="Payment settled on Canton">
-          <p className="font-medium">
+          <p className="break-words font-medium">
             <span className="num font-bold text-gold-ink">
               {money(result.amount)} {ASSET_LABEL[result.asset] ?? result.asset}
             </span>{" "}
-            is now with <strong>{result.to}</strong>.
+            is now with <strong className="break-all">{result.to}</strong>.
           </p>
-          <p className="mt-2 text-sm font-medium text-pen/65">
+          <p className="mt-2 break-words text-sm font-medium text-pen/65">
             {result.onboarded
               ? `${result.to} had no wallet. Selkie made one, and the money is already theirs.`
               : "The amount stays between you two."}

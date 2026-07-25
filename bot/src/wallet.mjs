@@ -160,6 +160,14 @@ export class Wallet {
    * @returns {Promise<{cid: string, owner: string, handle: string, created: boolean}>}
    */
   async ensureAccount(handle, platform = "x") {
+    // A handle is a social name, never a party id. The "::" namespace separator
+    // only appears in Canton addresses, so refuse to mint a wallet named after
+    // one: that is an address send that took a wrong turn, not a new user.
+    if (String(handle).includes("::")) {
+      const err = new Error("that looks like a Canton address, not a handle");
+      err.code = "ADDRESS_AS_HANDLE";
+      throw err;
+    }
     const existing = await this.findAccount(handle, platform);
     if (existing) return { ...existing, created: false };
 

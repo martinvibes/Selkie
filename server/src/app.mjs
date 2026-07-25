@@ -276,7 +276,7 @@ export function createApp({ wallet, config, history, tokens = [] }) {
             });
             return send(res, 200, { ...result, id: logged.id });
           } catch (err) {
-            const userError = ["INSUFFICIENT_FUNDS", "UNKNOWN_ADDRESS", "NO_SENDER_WALLET"].includes(err.code);
+            const userError = ["INSUFFICIENT_FUNDS", "UNKNOWN_ADDRESS", "NO_SENDER_WALLET", "ADDRESS_AS_HANDLE"].includes(err.code);
             return send(res, userError ? 400 : 500, { error: err.message, code: err.code ?? null });
           }
         }
