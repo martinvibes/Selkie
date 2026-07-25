@@ -1,5 +1,21 @@
 # Deploying Selkie
 
+## Live deployment
+
+Selkie is deployed on Canton DevNet:
+
+- **Front door (Vercel):** <https://selkiepay.vercel.app>
+- **Backend (Railway):** <https://selkie-api-production.up.railway.app>
+
+Vercel serves the web app and proxies `/api` and `/auth` to the Railway backend, so
+the browser stays on one origin. Dev login is disabled and cookies are Secure. The
+one remaining step to switch on Sign in with X is setting `X_CLIENT_ID` /
+`X_CLIENT_SECRET` on Railway from an X developer app whose callback is
+`https://selkiepay.vercel.app/auth/x/callback` (see Part A step 4). Until then the
+site is fully browsable and the login button shows a graceful "unavailable" notice.
+
+## Architecture
+
 Selkie ships as one small Node server that hosts the API, the Sign in with X flow,
 and the built web app, all on one origin. That single-origin shape is deliberate:
 the session cookie is `SameSite=Lax`, which rides the X login redirect cleanly when

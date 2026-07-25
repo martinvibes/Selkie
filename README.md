@@ -39,10 +39,11 @@ Built for **HackCanton Season 2** (July 2026). Track: Financial Applications. Ch
 
 ## Try it
 
-- **Telegram**: [**@selkiepay_bot**](https://t.me/selkiepay_bot) is live on Canton DevNet. Tap
-  `/start` and your Telegram username is your wallet.
-- **Web wallet**: run it locally in a minute (see [Run it](#run-it)). A hosted demo link lands here
-  for the submission.
+- **Web wallet**: **https://selkiepay.vercel.app** is the live app on Canton DevNet (frontend on
+  Vercel, backend on Railway). Browse it and the [in-app docs](https://selkiepay.vercel.app/docs), then
+  sign in with X to claim the wallet behind your handle.
+- **Telegram**: [**@selkiepay_bot**](https://t.me/selkiepay_bot) is live too. Tap `/start` and your
+  Telegram username is your wallet.
 
 ## What works today
 
