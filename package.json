@@ -1,0 +1,13 @@
+{
+  "name": "selkie",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Any handle is a private wallet on the Canton Network.",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "npm --prefix web-vite ci && npm --prefix web-vite run build",
+    "start": "node server/src/index.mjs"
+  }
+}

@@ -19,7 +19,7 @@ const config = {
   sessionSecret: process.env.SELKIE_SESSION_SECRET ?? randomBytes(32).toString("hex"),
   secureCookies: process.env.SELKIE_SECURE_COOKIES === "1",
   devLogin: process.env.SELKIE_DEV_LOGIN === "1",
-  webRoot: resolve(process.env.SELKIE_WEB_ROOT ?? join(here, "../../web")),
+  webRoot: resolve(process.env.SELKIE_WEB_ROOT ?? join(here, "../../web-vite/dist")),
   x: {
     clientId: process.env.X_CLIENT_ID ?? "",
     clientSecret: process.env.X_CLIENT_SECRET ?? "",

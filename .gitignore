@@ -4,6 +4,9 @@ node_modules/
 dist/
 .env
 .env.*
+# ...but keep the checked-in templates, which hold no secrets.
+!.env.example
+!**/.env.example
 *.log
 .DS_Store
 __pycache__/

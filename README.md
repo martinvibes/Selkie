@@ -173,6 +173,9 @@ cd ../server && source .env && node src/index.mjs
 cd ../bot && source .env && node src/index.mjs
 ```
 
+To put Selkie online (Railway for the server and web app, Vercel optional on the
+edge), see [`docs/deploy.md`](docs/deploy.md).
+
 ## Roadmap
 
 The wallet is real today. Here is what comes next.
