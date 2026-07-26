@@ -188,6 +188,10 @@ The wallet is real today. Here is what comes next.
 | **Pay straight from X**: reply to a post to pay, request or reward, handled inline on the timeline | In progress |
 | **Escrow and bill splitting** on the chat and web surfaces (the DAML is already on-ledger) | Planned |
 | **Rewards from replies**: reward the top replies to a post; the multi-pay payout primitive already runs behind `/api/campaign` | Exploring |
+| **Prediction markets**: back your take with your balance and settle privately in cBTC, cETH or CC | Vision |
+| **Group savings pools**: handle-based rotating pots, the savings circles millions already trust, now instant and private | Vision |
+| **Cross-border remittances**: send money home to a handle in a digital dollar, with no exchange or wire | Vision |
+| **Handle as a storefront**: one pay-link that turns any handle into a private way to get paid | Vision |
 
 ## Trust and custody
 

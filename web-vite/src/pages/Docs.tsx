@@ -9,11 +9,17 @@ import {
   Compass,
   EyeOff,
   Fingerprint,
+  Globe,
   HandCoins,
   Layers,
   Map as MapIcon,
+  Repeat,
+  Rocket,
   Send,
   Sparkles,
+  Store,
+  TrendingUp,
+  Users,
   Zap,
 } from "lucide-react";
 import { Footer, Header, Shell } from "../components/Layout";
@@ -33,6 +39,7 @@ const SECTIONS = [
   { id: "why-canton", label: "Why Canton", icon: Compass },
   { id: "architecture", label: "How it works", icon: Layers },
   { id: "roadmap", label: "Roadmap", icon: MapIcon },
+  { id: "vision", label: "Bigger picture", icon: Rocket },
 ] as const;
 
 const ROW = 2.6; // rem per nav row; the sliding pill uses this to land on-row.
@@ -406,6 +413,32 @@ export function Docs() {
                       <span className="shrink-0 rounded-full border-2 border-pen/15 bg-[#f7ecd2] px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-gold-ink">
                         {tag}
                       </span>
+                    </div>
+                  ))}
+                </div>
+              </Section>
+
+              <Section id="vision" title="The bigger picture">
+                <p>
+                  The wallet is real today. But once a handle is an account and privacy is the
+                  default, the same foundation opens onto much bigger things. Here is where Selkie
+                  is headed.
+                </p>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {[
+                    [<TrendingUp size={16} key="i" />, "Prediction markets", "Back your take with your balance. Join or create a market on any question, take your position privately, and settle in cBTC, cETH or Canton Coin. No public bet slip, no middleman."],
+                    [<Users size={16} key="i" />, "Group savings pools", "Start a shared pot with friends by their handles. Everyone chips in and it pays out on a schedule or a goal: the savings circles millions already trust, now instant and private."],
+                    [<Globe size={16} key="i" />, "Cross-border by handle", "Send money home to a handle, settled in seconds in a digital dollar, with no exchange and no wire. Whoever you paid just signs in with their handle to receive it."],
+                    [<Store size={16} key="i" />, "Handle as a storefront", "Turn any handle into a way to get paid. Share one link, take money from anyone, and keep the takings private. No terminal and no merchant account."],
+                    [<HandCoins size={16} key="i" />, "Payroll and mass payouts", "Pay a whole team or community in one move, each person by their handle. The payout engine already runs behind Selkie's reward tools."],
+                    [<Repeat size={16} key="i" />, "Subscriptions", "Support a creator or cover a bill on a repeat, by handle, and stop it any time you like."],
+                  ].map(([icon, t, d]) => (
+                    <div key={t as string} className="rounded-xl border-2 border-pen bg-card-bright p-4">
+                      <span className="grid h-9 w-9 place-items-center rounded-full border-2 border-pen bg-[#f7ecd2] text-gold-ink">
+                        {icon}
+                      </span>
+                      <p className="mt-3 text-sm font-bold">{t as string}</p>
+                      <p className="mt-0.5 text-[13px] text-pen/55">{d as string}</p>
                     </div>
                   ))}
                 </div>
