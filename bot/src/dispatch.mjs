@@ -19,6 +19,13 @@ const label = (asset) => LABELS[asset] ?? asset;
 
 const fmt = (n) => String(Number(n)).replace(/\.0+$/, "");
 
+// A payment reply can carry a link to its receipt page. Only the X surface
+// passes a base (its viewers sign in with the same handle to open it); Telegram
+// passes none, so its replies stay clean. Skipped when the entry never logged.
+function withReceipt(text, base, logged) {
+  return base && logged?.id ? `${text}\n\n🔗 View receipt: ${base}/tx/${logged.id}` : text;
+}
+
 const HELP = [
   "<b>Selkie</b>",
   "Your @handle is your wallet.",
@@ -115,7 +122,7 @@ export function formatHistory(items, now = Date.now()) {
  * @param {import("../../server/src/history.mjs").History} [ctx.history] - activity log, if the surface keeps one
  * @returns {Promise<string|null>} reply text, or null when the message isn't for us
  */
-export async function handleCommand({ wallet, from, text, platform = "x", history = null }) {
+export async function handleCommand({ wallet, from, text, platform = "x", history = null, txLinkBase = null }) {
   const cmd = parseCommand(text);
   if (!cmd) return null;
   if (cmd.type === "error") return `I couldn't do that: ${esc(cmd.reason)}`;
@@ -142,20 +149,29 @@ export async function handleCommand({ wallet, from, text, platform = "x", histor
           memo: cmd.memo,
           platform,
         });
+        // Logging must never undo a settled payment, so a failure here (a
+        // remote ingest blip, say) is swallowed; we just skip the receipt link.
+        let logged = null;
         if (history) {
-          await history.append({
-            type: "send",
-            from: res.from ?? normalizeHandle(from),
-            to: res.to,
-            asset: res.asset,
-            amount: res.amount,
-            memo: cmd.memo || "",
-          });
+          try {
+            logged = await history.append({
+              type: "send",
+              from: res.from ?? normalizeHandle(from),
+              to: res.to,
+              asset: res.asset,
+              amount: res.amount,
+              memo: cmd.memo || "",
+              onboarded: res.onboarded,
+            });
+          } catch {
+            /* the money moved; only the log didn't */
+          }
         }
-        const head = `✅ Transaction successful!\n💸 Sent <code>${fmt(res.amount)}</code> ${label(res.asset)} to ${res.to}`;
-        return res.onboarded
-          ? `${head}\n✨ ${res.to} had no wallet, so Selkie made one. The money is already theirs.`
-          : `${head}\n🔒 Settled on Canton. Your balance stays private.`;
+        const head = `✅ Transaction successful!\n\n💸 Sent <code>${fmt(res.amount)}</code> ${label(res.asset)} to ${res.to}`;
+        const tail = res.onboarded
+          ? `✨ ${res.to} had no wallet, so Selkie made one. The money is already theirs.`
+          : `🔒 Settled on Canton. Your balance stays private.`;
+        return withReceipt(`${head}\n\n${tail}`, txLinkBase, logged);
       }
 
       case "reward": {
@@ -173,10 +189,10 @@ export async function handleCommand({ wallet, from, text, platform = "x", histor
           memo: cmd.memo,
           platform,
         });
-        const head = `Asked ${res.to} for <code>${fmt(res.amount)}</code> ${label(res.asset)}.`;
+        const head = `📨 Request sent!\n\n💰 Asked ${res.to} for <code>${fmt(res.amount)}</code> ${label(res.asset)}`;
         return res.onboarded
-          ? `${head}\n${res.to} had no wallet, so Selkie made them one. They can pay you by replying <code>approve</code>.`
-          : `${head}\nThey pay by replying <code>approve</code>. Nothing moves until they do.`;
+          ? `${head}\n\n${res.to} had no wallet, so Selkie made them one. They can pay you by replying <code>approve</code>.`
+          : `${head}\n\nThey pay by replying <code>approve</code>. Nothing moves until they do.`;
       }
 
       case "requests": {
@@ -203,17 +219,23 @@ export async function handleCommand({ wallet, from, text, platform = "x", histor
           return `Declined ${target.from}'s request for <code>${fmt(target.amount)}</code> ${label(target.asset)}. No money moved.`;
         }
         const paid = await wallet.approveRequest({ cid: target.cid, payerHandle: from, platform });
+        let logged = null;
         if (history) {
-          await history.append({
-            type: "payment",
-            from: paid.from ?? normalizeHandle(from),
-            to: paid.to,
-            asset: paid.asset,
-            amount: paid.amount,
-            memo: "request",
-          });
+          try {
+            logged = await history.append({
+              type: "payment",
+              from: paid.from ?? normalizeHandle(from),
+              to: paid.to,
+              asset: paid.asset,
+              amount: paid.amount,
+              memo: "request",
+            });
+          } catch {
+            /* the money moved; only the log didn't */
+          }
         }
-        return `✅ Payment sent!\n💸 Paid ${paid.to} <code>${fmt(paid.amount)}</code> ${label(paid.asset)}\n🔒 Settled on Canton. Your balance stays private.`;
+        const body = `✅ Payment sent!\n\n💸 Paid ${paid.to} <code>${fmt(paid.amount)}</code> ${label(paid.asset)}\n\n🔒 Settled on Canton. Your balance stays private.`;
+        return withReceipt(body, txLinkBase, logged);
       }
 
       case "escrow":

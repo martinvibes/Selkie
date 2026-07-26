@@ -202,6 +202,31 @@ export function createApp({ wallet, config, history, tokens = [] }) {
 
       // --- API --------------------------------------------------------
       if (pathname.startsWith("/api/")) {
+        // Machine-to-machine: the bot settles payments on Canton from another
+        // host, then pushes each one here so it shows in the web activity feed
+        // and earns a shareable receipt. Authed by a shared secret, not a
+        // browser session, so it sits ahead of the session gate.
+        if (pathname === "/api/ingest" && req.method === "POST") {
+          if (!config.ingestSecret || req.headers["x-ingest-secret"] !== config.ingestSecret) {
+            return send(res, 401, { error: "unauthorized" });
+          }
+          const body = await readBody(req);
+          const entry = {
+            type: ["send", "payment", "reward", "deposit"].includes(body.type) ? body.type : "send",
+            from: normalizeHandle(String(body.from ?? "")),
+            to: normalizeHandle(String(body.to ?? "")),
+            asset: String(body.asset ?? "").toUpperCase(),
+            amount: Number(body.amount),
+            memo: String(body.memo ?? "").slice(0, 140),
+          };
+          if (body.onboarded != null) entry.onboarded = Boolean(body.onboarded);
+          if (entry.from === "@" || entry.to === "@" || !ASSETS.includes(entry.asset) || !(entry.amount > 0)) {
+            return send(res, 400, { error: "bad entry" });
+          }
+          const logged = await history.append(entry);
+          return send(res, 200, { id: logged.id });
+        }
+
         const session = sessionOf(req);
         if (!session) return send(res, 401, { error: "not signed in" });
 

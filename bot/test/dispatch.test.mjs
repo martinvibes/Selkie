@@ -76,6 +76,7 @@ describe("dispatch", () => {
       asset: "CC",
       amount: 5,
       memo: "for lunch",
+      onboarded: false,
     });
   });
 

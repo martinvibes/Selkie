@@ -12,6 +12,7 @@ import { ledgerFromEnv } from "./ledger.mjs";
 import { Wallet } from "./wallet.mjs";
 import { TelegramBot } from "./telegram.mjs";
 import { XWorker } from "./x.mjs";
+import { RemoteHistory } from "./remote-history.mjs";
 import { History } from "../../server/src/history.mjs";
 
 const cfg = {
@@ -86,8 +87,24 @@ if (xKeys.apiKey && xKeys.apiSecret && xKeys.accessToken && xKeys.accessSecret) 
       console.error(`x state save failed: ${err.message}`);
     }
   };
-  const xHistoryPath = process.env.SELKIE_HISTORY ?? join(here, "../../.data/history.jsonl");
-  const worker = new XWorker({ ...xKeys, wallet, history: new History(xHistoryPath), state, saveState });
+  // The web dashboard's history lives on another host (Railway); the bot runs
+  // here. When an API URL and ingest secret are set, push activity to the
+  // server so it shows in the web feed and gets a receipt page; otherwise fall
+  // back to a local file for offline/dev runs.
+  const apiUrl = process.env.SELKIE_API_URL;
+  const ingestSecret = process.env.SELKIE_INGEST_SECRET;
+  const xHistory =
+    apiUrl && ingestSecret
+      ? new RemoteHistory({ apiUrl, secret: ingestSecret })
+      : new History(process.env.SELKIE_HISTORY ?? join(here, "../../.data/history.jsonl"));
+  const worker = new XWorker({
+    ...xKeys,
+    wallet,
+    history: xHistory,
+    webUrl: process.env.SELKIE_WEB_URL || "https://selkiepay.vercel.app",
+    state,
+    saveState,
+  });
   process.on("SIGINT", () => worker.stop());
   tasks.push(worker.start());
   console.log(`Starting Selkie X worker for @${xKeys.handle}.`);

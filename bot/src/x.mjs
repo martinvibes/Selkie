@@ -48,6 +48,7 @@ export class XWorker {
    * @param {string} [cfg.handle]      - the bot's own handle, default SelkiePay
    * @param {import("./wallet.mjs").Wallet} cfg.wallet
    * @param {import("../../server/src/history.mjs").History} [cfg.history] - activity log the web dashboard reads
+   * @param {string} [cfg.webUrl] - web app base, used to link a payment receipt
    * @param {number} [cfg.pollSeconds] - seconds between mention polls
    * @param {object} [cfg.state]       - restored { sinceId }
    * @param {(state: object) => void} [cfg.saveState] - persist { sinceId }
@@ -61,6 +62,7 @@ export class XWorker {
     handle = "SelkiePay",
     wallet,
     history = null,
+    webUrl = "https://selkiepay.vercel.app",
     pollSeconds = 10,
     state = {},
     saveState = null,
@@ -73,6 +75,7 @@ export class XWorker {
     this.handle = String(handle).replace(/^@/, "");
     this.wallet = wallet;
     this.history = history;
+    this.webUrl = webUrl;
     this.pollMs = Math.max(5, pollSeconds) * 1000;
     this.saveState = saveState;
     this.sinceId = state.sinceId ?? null;
@@ -215,6 +218,7 @@ export class XWorker {
       text: tweet.text,
       platform: "x",
       history: this.history,
+      txLinkBase: this.webUrl,
     });
     if (reply) await this.reply(htmlToText(reply), tweet.id);
   }
