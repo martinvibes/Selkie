@@ -152,10 +152,10 @@ export async function handleCommand({ wallet, from, text, platform = "x", histor
             memo: cmd.memo || "",
           });
         }
-        const head = `Sent <code>${fmt(res.amount)}</code> ${label(res.asset)} to ${res.to}.`;
+        const head = `✅ Transaction successful!\n💸 Sent <code>${fmt(res.amount)}</code> ${label(res.asset)} to ${res.to}`;
         return res.onboarded
-          ? `${head}\n${res.to} had no wallet, so Selkie just made one for them. The money is already theirs.`
-          : `${head}\nSettled on Canton. Nobody else can see the amount.`;
+          ? `${head}\n✨ ${res.to} had no wallet, so Selkie made one. The money is already theirs.`
+          : `${head}\n🔒 Settled on Canton. Your balance stays private.`;
       }
 
       case "reward": {
@@ -213,7 +213,7 @@ export async function handleCommand({ wallet, from, text, platform = "x", histor
             memo: "request",
           });
         }
-        return `Paid ${paid.to} <code>${fmt(paid.amount)}</code> ${label(paid.asset)}.\nSettled on Canton. Nobody else can see the amount.`;
+        return `✅ Payment sent!\n💸 Paid ${paid.to} <code>${fmt(paid.amount)}</code> ${label(paid.asset)}\n🔒 Settled on Canton. Your balance stays private.`;
       }
 
       case "escrow":

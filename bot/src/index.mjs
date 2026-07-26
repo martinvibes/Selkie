@@ -86,7 +86,8 @@ if (xKeys.apiKey && xKeys.apiSecret && xKeys.accessToken && xKeys.accessSecret) 
       console.error(`x state save failed: ${err.message}`);
     }
   };
-  const worker = new XWorker({ ...xKeys, wallet, state, saveState });
+  const xHistoryPath = process.env.SELKIE_HISTORY ?? join(here, "../../.data/history.jsonl");
+  const worker = new XWorker({ ...xKeys, wallet, history: new History(xHistoryPath), state, saveState });
   process.on("SIGINT", () => worker.stop());
   tasks.push(worker.start());
   console.log(`Starting Selkie X worker for @${xKeys.handle}.`);

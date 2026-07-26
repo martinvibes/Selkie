@@ -47,6 +47,7 @@ export class XWorker {
    * @param {string} cfg.accessSecret  - @SelkiePay access token secret
    * @param {string} [cfg.handle]      - the bot's own handle, default SelkiePay
    * @param {import("./wallet.mjs").Wallet} cfg.wallet
+   * @param {import("../../server/src/history.mjs").History} [cfg.history] - activity log the web dashboard reads
    * @param {number} [cfg.pollSeconds] - seconds between mention polls
    * @param {object} [cfg.state]       - restored { sinceId }
    * @param {(state: object) => void} [cfg.saveState] - persist { sinceId }
@@ -59,7 +60,8 @@ export class XWorker {
     accessSecret,
     handle = "SelkiePay",
     wallet,
-    pollSeconds = 15,
+    history = null,
+    pollSeconds = 10,
     state = {},
     saveState = null,
     log = console.log,
@@ -70,6 +72,7 @@ export class XWorker {
     this.accessSecret = accessSecret;
     this.handle = String(handle).replace(/^@/, "");
     this.wallet = wallet;
+    this.history = history;
     this.pollMs = Math.max(5, pollSeconds) * 1000;
     this.saveState = saveState;
     this.sinceId = state.sinceId ?? null;
@@ -211,6 +214,7 @@ export class XWorker {
       from: author,
       text: tweet.text,
       platform: "x",
+      history: this.history,
     });
     if (reply) await this.reply(htmlToText(reply), tweet.id);
   }
