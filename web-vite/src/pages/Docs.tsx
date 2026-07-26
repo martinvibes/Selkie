@@ -13,6 +13,7 @@ import {
   HandCoins,
   Layers,
   Map as MapIcon,
+  MessageCircle,
   Repeat,
   Rocket,
   Send,
@@ -30,6 +31,7 @@ import { TokenIcon } from "../components/TokenIcon";
 const SECTIONS = [
   { id: "overview", label: "Overview", icon: BookOpen },
   { id: "quickstart", label: "Quick start", icon: Zap },
+  { id: "pay-on-x", label: "Pay on X", icon: MessageCircle },
   { id: "sending", label: "Sending", icon: Send },
   { id: "requests", label: "Requests", icon: HandCoins },
   { id: "receiving", label: "Receiving", icon: AtSign },
@@ -230,6 +232,93 @@ export function Docs() {
                 </ol>
               </Section>
 
+              <Section id="pay-on-x" title="Pay on X">
+                <p>
+                  This is where Selkie started. You can pay anyone straight from a post: write a
+                  tweet that tags <span className="font-semibold text-pen">@SelkiePay</span> with
+                  what you want to do. Selkie reads it, settles it on Canton in seconds, and replies
+                  to you with a private receipt you can open in your wallet.
+                </p>
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="rounded-xl border-2 border-pen bg-card-bright p-4">
+                    <p className="flex items-center gap-2 font-bold">
+                      <Sparkles size={16} className="text-gold-ink" /> New here? Open your wallet
+                    </p>
+                    <p className="mt-1.5 text-sm text-pen/65">
+                      Your X handle is already your wallet. There is nothing to install and no seed
+                      phrase to keep. Two ways to open it:
+                    </p>
+                    <ul className="mt-2.5 space-y-2 text-sm text-pen/65">
+                      <li className="flex gap-2">
+                        <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-gold" />
+                        The first time anyone pays your handle on X, Selkie creates your wallet for
+                        you and the money is already yours. You do nothing.
+                      </li>
+                      <li className="flex gap-2">
+                        <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-gold" />
+                        Or open it yourself in one tap. Sign in with X at selkiepay.vercel.app, then
+                        add funds from Receive.
+                      </li>
+                    </ul>
+                  </div>
+                  <div className="rounded-xl border-2 border-pen bg-card-bright p-4">
+                    <p className="flex items-center gap-2 font-bold">
+                      <Zap size={16} className="text-gold-ink" /> Already set up? The flow
+                    </p>
+                    <ol className="mt-2.5 space-y-2 text-sm text-pen/65">
+                      {[
+                        "Post or reply with a command that tags @SelkiePay.",
+                        "Selkie settles it on Canton and replies to you in about ten seconds.",
+                        "Tap the receipt link in the reply, or open your wallet any time to see it.",
+                      ].map((s, i) => (
+                        <li key={s} className="flex gap-2.5">
+                          <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full border-2 border-pen bg-[#f7ecd2] font-display text-[11px] font-bold text-gold-ink">
+                            {i + 1}
+                          </span>
+                          {s}
+                        </li>
+                      ))}
+                    </ol>
+                  </div>
+                </div>
+
+                <div className="rounded-xl border-2 border-pen bg-[#f7ecd2] p-4">
+                  <p className="text-[13px] font-bold uppercase tracking-wide text-gold-ink">
+                    A full round trip
+                  </p>
+                  <p className="mt-2 text-sm text-pen/75">
+                    You post <Code>@SelkiePay send 5 CC to @ada</Code>. Selkie replies:{" "}
+                    <span className="font-semibold text-pen">
+                      Transaction successful. Sent 5 CC to @ada. Settled on Canton, your balance
+                      stays private.
+                    </span>{" "}
+                    If @ada is brand new, that same payment opens their wallet, and they sign in with
+                    X to find the money waiting.
+                  </p>
+                </div>
+
+                <p className="font-semibold text-pen">Every command</p>
+                <p>
+                  Start any command by tagging <Code>@SelkiePay</Code> in a post or a reply. Amounts
+                  work with any Selkie asset: CC, USDCX, cBTC or cETH.
+                </p>
+                <div className="rounded-xl border-2 border-pen bg-card-bright p-4">
+                  <Ref cmd={<Code>send 5 CC to @ada</Code>} desc="Pay any handle. If they are new, the payment opens their wallet." />
+                  <Ref cmd={<Code>send 5 CC to @ada for lunch</Code>} desc="Add a note on the end. Only the two of you ever see it." />
+                  <Ref cmd={<Code>request 10 CC from @ada</Code>} desc="Ask a handle to pay you. Nothing moves until they approve." />
+                  <Ref cmd={<Code>requests</Code>} desc="See who is waiting on you." />
+                  <Ref cmd={<Code>approve @ada</Code>} desc="Pay a request someone sent you. This is what moves the money." />
+                  <Ref cmd={<Code>decline @ada</Code>} desc="Turn a request down. Nothing moves." />
+                  <Ref cmd={<Code>balance</Code>} desc="Stays private. Selkie points you to your wallet instead of ever posting it." />
+                  <Ref cmd={<Code>history</Code>} desc="Private too. Open your wallet to see your activity." />
+                </div>
+                <p className="text-sm text-pen/60">
+                  Your balance and your history never get posted on the timeline. Tag either one and
+                  Selkie just points you to your wallet, because your money is nobody else's business.
+                </p>
+              </Section>
+
               <Section id="sending" title="Sending money">
                 <p>
                   Open <span className="font-semibold text-pen">Send</span> and choose how to name
@@ -402,7 +491,6 @@ export function Docs() {
                   {[
                     ["On and off ramp", "Move between local money and Selkie balances, so funding a wallet and cashing out are as simple as the rest of the app.", "Planned"],
                     ["Send to any Canton wallet", "Withdraw to a non-Selkie Canton address, not just between Selkie wallets.", "Planned"],
-                    ["Pay straight from X", "Reply to a post to pay, request or reward, with the transaction handled inline on the timeline.", "In progress"],
                     ["Rewards and splits", "Reward the top replies to a post, or split a bill across many handles at once.", "Exploring"],
                   ].map(([t, d, tag]) => (
                     <div key={t} className="flex items-start justify-between gap-4 rounded-xl border-2 border-pen bg-card-bright p-4">
