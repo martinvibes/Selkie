@@ -185,6 +185,9 @@ export function Footer() {
             <span className="font-display font-bold text-ivory/85">Selkie</span>
           </span>
           <nav className="flex items-center gap-6">
+            <Link to="/pitch" className="font-semibold transition-colors hover:text-ivory">
+              Pitch
+            </Link>
             <Link to="/docs" className="font-semibold transition-colors hover:text-ivory">
               Docs
             </Link>

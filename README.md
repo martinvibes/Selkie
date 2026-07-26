@@ -18,6 +18,14 @@
   <img src="https://img.shields.io/badge/license-MIT-131a21" alt="MIT">
 </p>
 
+<p align="center">
+  <b><a href="https://selkiepay.vercel.app">Live app</a></b>
+  &nbsp;·&nbsp; <a href="https://selkiepay.vercel.app/pitch">Pitch</a>
+  &nbsp;·&nbsp; <a href="https://selkiepay.vercel.app/docs">Docs</a>
+  &nbsp;·&nbsp; <a href="https://t.me/selkiepay_bot">Telegram</a>
+  &nbsp;·&nbsp; <a href="https://x.com/SelkiePay">X</a>
+</p>
+
 ---
 
 ## The idea
@@ -39,6 +47,12 @@ Built for **HackCanton Season 2** (July 2026). Track: Financial Applications. Ch
 
 ## Try it
 
+New here? The [two-minute pitch](https://selkiepay.vercel.app/pitch) is the fastest way to see why
+Selkie exists. Then reach for it on whichever surface you already live on.
+
+- **On X**: reply to a post or mention [**@SelkiePay**](https://x.com/SelkiePay) with a command like
+  `send 5 CC to @ada`. Selkie settles it on Canton and replies with a private receipt link. This is
+  where Selkie started.
 - **Web wallet**: **https://selkiepay.vercel.app** is the live app on Canton DevNet (frontend on
   Vercel, backend on Railway). Browse it and the [in-app docs](https://selkiepay.vercel.app/docs), then
   sign in with X to claim the wallet behind your handle.
@@ -60,8 +74,10 @@ Everything below settles on real Canton contracts. There are no mocks.
 | `history` | Your recent activity, grouped by day. |
 | `receive` | Your handle and the Canton address behind it, to fund from any Canton wallet. |
 
-Two surfaces, one wallet grammar:
+Three surfaces, one wallet grammar:
 
+- **X** (`bot/`): reply to a post or mention **@SelkiePay** with a command, and Selkie pays, requests,
+  or answers a request straight from the timeline, then replies with a private receipt link.
 - **Web** (`web-vite/`): a React app. Continue with X, then a dashboard for balances, send, requests,
   activity, and a shareable page for any handle so it can be paid before it even has a wallet.
 - **Telegram** (`bot/`): the same commands as a chat bot, with a persistent button bar, a full
@@ -185,7 +201,6 @@ The wallet is real today. Here is what comes next.
 |---|---|
 | **On and off ramp** so funding and cashing out are as easy as the rest of the app | Planned |
 | **Send to any Canton wallet**, not just between Selkie handles | Planned |
-| **Pay straight from X**: reply to a post to pay, request or reward, handled inline on the timeline | In progress |
 | **Escrow and bill splitting** on the chat and web surfaces (the DAML is already on-ledger) | Planned |
 | **Rewards from replies**: reward the top replies to a post; the multi-pay payout primitive already runs behind `/api/campaign` | Exploring |
 | **Prediction markets**: back your take with your balance and settle privately in cBTC, cETH or CC | Vision |

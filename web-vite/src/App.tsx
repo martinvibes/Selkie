@@ -7,6 +7,7 @@ import { Dashboard } from "./pages/Dashboard";
 import { Account } from "./pages/Account";
 import { TransactionDetail } from "./pages/TransactionDetail";
 import { Docs } from "./pages/Docs";
+import { Pitch } from "./pages/Pitch";
 
 export default function App() {
   return (
@@ -19,6 +20,9 @@ export default function App() {
 
           {/* Everything the wallet can do, and how it works. */}
           <Route path="/docs" element={<Docs />} />
+
+          {/* The story: why Selkie, why Canton, where it goes. */}
+          <Route path="/pitch" element={<Pitch />} />
 
           {/* Your wallet, tabbed. */}
           <Route path="/dashboard" element={<Navigate to="/dashboard/activity" replace />} />
