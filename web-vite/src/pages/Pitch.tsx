@@ -1,17 +1,12 @@
-import { type ReactNode } from "react";
-import { Link } from "react-router-dom";
+import { useCallback, useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import {
+  ArrowLeft,
   ArrowRight,
-  ArrowUpRight,
-  AtSign,
-  BookOpen,
   Coins,
   EyeOff,
   Globe,
-  Layers,
   Lock,
   MessageCircle,
-  Send,
   ShieldCheck,
   Sparkles,
   Store,
@@ -20,397 +15,427 @@ import {
   Wallet,
   Zap,
 } from "lucide-react";
-import { Footer, Header, Shell, Spinner } from "../components/Layout";
-import { XLogo } from "../components/Mark";
-import { Reveal } from "../components/Reveal";
+import { Mark, Wordmark, XLogo } from "../components/Mark";
 import { TokenIcon } from "../components/TokenIcon";
-import { useAuth } from "../contexts/useAuth";
 
-/** A command chip, styled to match the docs. */
+/**
+ * The pitch, as a full-screen deck you click through to open the demo. Six
+ * slides, stacked in 3D depth: click Next and the slide you leave rises and
+ * sinks into the dark while the next surfaces from the deep (see .deck-* in
+ * index.css). Arrow keys or the buttons drive it. Numbers top-right and a
+ * gold progress bar along the bottom keep your place.
+ */
+
+/** A staggered content block: rises and unblurs when its slide surfaces. */
+function Rise({ i, children, className = "" }: { i: number; children: ReactNode; className?: string }) {
+  return (
+    <div className={`rise ${className}`} style={{ "--i": i } as CSSProperties}>
+      {children}
+    </div>
+  );
+}
+
+/** A command chip, matching the docs. */
 function Cmd({ children }: { children: ReactNode }) {
   return (
-    <code className="rounded-md border-2 border-pen/12 bg-[#f2e6cc] px-1.5 py-0.5 font-mono text-[0.85em] font-semibold text-gold-ink">
+    <code className="rounded-md border-2 border-pen/12 bg-[#f2e6cc] px-1.5 py-0.5 font-mono text-[0.82em] font-semibold text-gold-ink">
       {children}
     </code>
   );
 }
 
-/** Section eyebrow + heading, on the open water. */
-function Lead({ eyebrow, title, sub }: { eyebrow: string; title: ReactNode; sub?: ReactNode }) {
-  return (
-    <Reveal>
-      <p className="eyebrow text-gold">{eyebrow}</p>
-      <h2 className="mt-2 font-display text-3xl font-bold tracking-tight text-ivory sm:text-4xl text-balance">
-        {title}
-      </h2>
-      {sub && <p className="mt-3 max-w-2xl text-[15px] leading-relaxed text-ivory/65">{sub}</p>}
-    </Reveal>
-  );
-}
-
 const SURFACES = [
   {
-    icon: <XLogo size={17} />,
+    icon: <XLogo size={18} />,
     tag: "On X",
     title: "Pay from the timeline",
-    body: "Reply to a post or mention @SelkiePay with what you want to do. Selkie settles it on Canton and replies with a private receipt. This is where Selkie started.",
+    body: "Mention @SelkiePay in a post or reply. Selkie settles it and replies with a private receipt.",
     demo: <Cmd>@SelkiePay send 5 CC to @ada</Cmd>,
   },
   {
-    icon: <MessageCircle size={17} />,
+    icon: <MessageCircle size={18} />,
     tag: "On Telegram",
     title: "Pay from a chat",
-    body: "Open @selkiepay_bot and tap start. Your Telegram username is your wallet, with a button bar, a slash-command menu and inline Pay or Decline buttons on requests.",
+    body: "Open @selkiepay_bot and tap start. Your Telegram username is the wallet, with buttons and a command menu.",
     demo: <Cmd>send 10 USDCx to @ada</Cmd>,
   },
   {
-    icon: <Wallet size={17} />,
+    icon: <Wallet size={18} />,
     tag: "On the web",
     title: "The full dashboard",
-    body: "Sign in with X for balances, send, requests and activity, plus a shareable pay page for any handle, so a handle can be paid before it even has a wallet.",
+    body: "Sign in with X for balances, send, requests, activity and a shareable pay page for any handle.",
     demo: <Cmd>selkiepay.vercel.app</Cmd>,
   },
 ];
 
 const WHY_CANTON = [
-  {
-    icon: <EyeOff size={18} />,
-    t: "Privacy is native",
-    d: "A payment is shared only with the two people in it, enforced by the ledger, not promised in a policy. A consumer wallet has to keep balances private. On Canton that is the default, not a bolt-on.",
-  },
-  {
-    icon: <Coins size={18} />,
-    t: "Real, interoperable assets",
-    d: "Canton Coin is native, and Bitcoin and Ether arrive as cBTC and cETH through one shared token standard. Selkie speaks that standard, so every asset moves through the same path.",
-  },
-  {
-    icon: <Zap size={18} />,
-    t: "Settlement without gas games",
-    d: "Payments settle deterministically. There is no public mempool to front-run and no gas auction to lose money in. That is what lets a handle-to-handle payment feel instant.",
-  },
-];
-
-const PROOF = [
-  { icon: <ShieldCheck size={16} />, t: "Live on Canton DevNet", d: "Not a demo stub. The wallet runs on the real network today." },
-  { icon: <Layers size={16} />, t: "Every transfer is on-ledger", d: "Each settlement has an updateId on the JSON Ledger API v2." },
-  { icon: <Lock size={16} />, t: "Open reserve, no login", d: "GET /api/reserve proves the cBTC and cETH holdings to anyone." },
-  { icon: <Sparkles size={16} />, t: "No mocks", d: "Balances read straight from the ledger, never a cache." },
+  { icon: <EyeOff size={18} />, t: "Privacy is native", d: "A payment is shared only with the two people in it, enforced by the ledger. Private by default, not a bolt-on." },
+  { icon: <Coins size={18} />, t: "Real assets", d: "Canton Coin is native. Bitcoin and Ether arrive as cBTC and cETH through one shared token standard." },
+  { icon: <Zap size={18} />, t: "Settlement, no gas games", d: "Payments settle deterministically. No mempool to front-run, no gas auction to lose. That is why it feels instant." },
 ];
 
 const VISION = [
-  { icon: <TrendingUp size={16} />, t: "Prediction markets", d: "Back your take with your balance and settle privately in cBTC, cETH or CC." },
-  { icon: <Users size={16} />, t: "Group savings pools", d: "Handle-based rotating pots, the savings circles millions trust, now instant and private." },
-  { icon: <Globe size={16} />, t: "Cross-border by handle", d: "Send money home to a handle in a digital dollar, with no exchange and no wire." },
+  { icon: <TrendingUp size={16} />, t: "Prediction markets", d: "Back your take and settle privately in cBTC, cETH or CC." },
+  { icon: <Users size={16} />, t: "Group savings pools", d: "Handle-based rotating pots, now instant and private." },
+  { icon: <Globe size={16} />, t: "Cross-border by handle", d: "Send money home in a digital dollar, no exchange, no wire." },
   { icon: <Store size={16} />, t: "Handle as a storefront", d: "One pay-link turns any handle into a private way to get paid." },
 ];
 
-export function Pitch() {
-  const { me, loading } = useAuth();
+/* ---- the six slides ---- */
 
-  if (loading) return <Spinner />;
-
-  const cta = me ? (
-    <Link to="/dashboard/activity" className="btn btn-gold">
-      Open your wallet <ArrowRight size={16} />
-    </Link>
-  ) : (
-    <a href="/auth/x/login" className="btn btn-gold">
-      <XLogo size={15} /> Continue with X
-    </a>
+function SlideTitle() {
+  return (
+    <div className="relative z-10 mx-auto w-full max-w-3xl text-center">
+      <Rise i={0}>
+        <div className="flex justify-center">
+          <Mark size={62} />
+        </div>
+      </Rise>
+      <Rise i={1}>
+        <p className="eyebrow mt-7 text-gold">Selkie · HackCanton Season 2</p>
+      </Rise>
+      <Rise i={2}>
+        <h1 className="mt-4 font-display text-[clamp(2.6rem,7vw,5rem)] font-bold leading-[1.02] tracking-[-0.03em] text-ivory text-balance">
+          Any handle is a<br />
+          <span className="text-gold-grad">private wallet.</span>
+        </h1>
+      </Rise>
+      <Rise i={3}>
+        <p className="mx-auto mt-6 max-w-xl text-[1.05rem] leading-relaxed text-ivory/70">
+          Send real money to an X or Telegram name in seconds, on the Canton Network. No app, no
+          seed phrase, no gas, no public balance.
+        </p>
+      </Rise>
+      <Rise i={4}>
+        <p className="mt-10 text-[12px] font-bold uppercase tracking-[0.18em] text-ivory/40">
+          Press the arrow to begin
+        </p>
+      </Rise>
+    </div>
   );
+}
+
+function SlideProblem() {
+  return (
+    <div className="relative z-10 mx-auto w-full max-w-3xl text-center">
+      <Rise i={0}>
+        <p className="eyebrow text-gold">The problem</p>
+      </Rise>
+      <Rise i={1}>
+        <h2 className="mt-3 font-display text-[clamp(2rem,5vw,3.4rem)] font-bold leading-[1.06] tracking-[-0.02em] text-ivory text-balance">
+          Crypto keeps losing people at the same wall.
+        </h2>
+      </Rise>
+      <div className="mt-9 grid gap-4 text-left sm:grid-cols-2">
+        <Rise i={2}>
+          <div className="chunk h-full p-6">
+            <span className="grid h-11 w-11 place-items-center rounded-xl border-2 border-pen bg-[#f7ecd2] text-gold-ink">
+              <Lock size={19} />
+            </span>
+            <h3 className="mt-4 font-display text-lg font-bold">The friction wall</h3>
+            <p className="mt-1.5 text-sm font-medium leading-relaxed text-pen/65">
+              Install a wallet, write down twelve words, buy gas, then paste a forty-character
+              address you cannot read. Most people quit right here.
+            </p>
+          </div>
+        </Rise>
+        <Rise i={3}>
+          <div className="chunk h-full p-6">
+            <span className="grid h-11 w-11 place-items-center rounded-xl border-2 border-pen bg-[#f7ecd2] text-gold-ink">
+              <EyeOff size={19} />
+            </span>
+            <h3 className="mt-4 font-display text-lg font-bold">The privacy wall</h3>
+            <p className="mt-1.5 text-sm font-medium leading-relaxed text-pen/65">
+              The apps that finally remove that friction run on public chains, so every balance and
+              payment becomes a post the whole world can read forever.
+            </p>
+          </div>
+        </Rise>
+      </div>
+      <Rise i={4}>
+        <p className="mt-8 text-[1.05rem] font-semibold text-ivory/80">
+          You get ease, or you get privacy. Almost nobody gives you both.
+        </p>
+      </Rise>
+    </div>
+  );
+}
+
+function SlideSolution() {
+  return (
+    <div className="relative z-10 mx-auto w-full max-w-3xl text-center">
+      <Rise i={0}>
+        <p className="eyebrow text-gold">The solution</p>
+      </Rise>
+      <Rise i={1}>
+        <h2 className="mt-3 font-display text-[clamp(2rem,5vw,3.4rem)] font-bold leading-[1.06] tracking-[-0.02em] text-ivory text-balance">
+          Your handle is the wallet.
+          <br />
+          <span className="text-gold-grad">Private by default.</span>
+        </h2>
+      </Rise>
+      <Rise i={2}>
+        <div className="chunk-gold mx-auto mt-8 max-w-xl px-6 py-7">
+          <p className="eyebrow">The whole product</p>
+          <p className="mt-2.5 font-mono text-[clamp(1.4rem,4.6vw,2.4rem)] font-bold text-pen">
+            send 5 CC to @ada
+          </p>
+        </div>
+      </Rise>
+      <Rise i={3}>
+        <p className="mx-auto mt-6 max-w-xl text-[1.05rem] leading-relaxed text-ivory/70">
+          One line moves money to a name. If they are new, the payment itself opens their wallet, and
+          it stays between the two of you.
+        </p>
+      </Rise>
+    </div>
+  );
+}
+
+function SlideSurfaces() {
+  return (
+    <div className="relative z-10 mx-auto w-full max-w-5xl">
+      <div className="text-center">
+        <Rise i={0}>
+          <p className="eyebrow text-gold">One wallet, three ways in</p>
+        </Rise>
+        <Rise i={1}>
+          <h2 className="mt-3 font-display text-[clamp(1.9rem,4.6vw,3.2rem)] font-bold tracking-[-0.02em] text-ivory text-balance">
+            Wherever people already talk.
+          </h2>
+        </Rise>
+      </div>
+      <div className="mt-10 grid gap-5 md:grid-cols-3">
+        {SURFACES.map((s, i) => (
+          <Rise key={s.tag} i={2 + i}>
+            <div className="chunk flex h-full flex-col p-6 text-left">
+              <span className="grid h-11 w-11 place-items-center rounded-xl border-2 border-pen bg-[#f7ecd2] text-gold-ink">
+                {s.icon}
+              </span>
+              <p className="eyebrow mt-4">{s.tag}</p>
+              <h3 className="mt-1 font-display text-lg font-bold">{s.title}</h3>
+              <p className="mt-1.5 flex-1 text-sm font-medium leading-relaxed text-pen/65">{s.body}</p>
+              <div className="mt-4">{s.demo}</div>
+            </div>
+          </Rise>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function SlideCanton() {
+  return (
+    <div className="relative z-10 mx-auto w-full max-w-4xl">
+      <div className="text-center">
+        <Rise i={0}>
+          <p className="eyebrow text-gold">Why Canton</p>
+        </Rise>
+        <Rise i={1}>
+          <h2 className="mt-3 font-display text-[clamp(1.9rem,4.6vw,3.2rem)] font-bold tracking-[-0.02em] text-ivory text-balance">
+            Real privacy. Real assets. Real settlement.
+          </h2>
+        </Rise>
+      </div>
+      <div className="mt-9 grid gap-4 md:grid-cols-3">
+        {WHY_CANTON.map((c, i) => (
+          <Rise key={c.t} i={2 + i}>
+            <div className="chunk h-full p-6 text-left">
+              <span className="grid h-11 w-11 place-items-center rounded-xl border-2 border-pen bg-[#f7ecd2] text-gold-ink">
+                {c.icon}
+              </span>
+              <h3 className="mt-4 font-display text-base font-bold">{c.t}</h3>
+              <p className="mt-1.5 text-sm font-medium leading-relaxed text-pen/65">{c.d}</p>
+            </div>
+          </Rise>
+        ))}
+      </div>
+      <Rise i={5}>
+        <div className="mt-6 flex flex-wrap items-center justify-center gap-2.5">
+          {[
+            ["CC", "Canton Coin"],
+            ["USDCX", "USDCx"],
+            ["CBTC", "cBTC"],
+            ["CETH", "cETH"],
+          ].map(([a, label]) => (
+            <span key={a} className="chunk inline-flex items-center gap-2 rounded-full px-3.5 py-2 text-sm font-bold">
+              <TokenIcon asset={a} size={19} />
+              {label}
+            </span>
+          ))}
+          <span className="inline-flex items-center gap-2 rounded-full border-2 border-gold/30 bg-gold/10 px-3.5 py-2 text-sm font-bold text-gold">
+            <ShieldCheck size={16} /> Live on DevNet, no mocks
+          </span>
+        </div>
+      </Rise>
+    </div>
+  );
+}
+
+function SlideVision() {
+  return (
+    <div className="relative z-10 mx-auto w-full max-w-4xl text-center">
+      <Rise i={0}>
+        <p className="eyebrow text-gold">Where this goes</p>
+      </Rise>
+      <Rise i={1}>
+        <h2 className="mt-3 font-display text-[clamp(1.9rem,4.6vw,3.2rem)] font-bold tracking-[-0.02em] text-ivory text-balance">
+          A handle that pays is a platform.
+        </h2>
+      </Rise>
+      <div className="mt-8 grid gap-4 text-left sm:grid-cols-2 lg:grid-cols-4">
+        {VISION.map((v, i) => (
+          <Rise key={v.t} i={2 + i}>
+            <div className="chunk h-full p-5">
+              <span className="grid h-9 w-9 place-items-center rounded-full border-2 border-pen bg-[#f7ecd2] text-gold-ink">
+                {v.icon}
+              </span>
+              <p className="mt-3 text-sm font-bold">{v.t}</p>
+              <p className="mt-1 text-[13px] font-medium leading-relaxed text-pen/55">{v.d}</p>
+            </div>
+          </Rise>
+        ))}
+      </div>
+      <Rise i={6}>
+        <p className="mt-9 font-display text-2xl font-bold text-ivory sm:text-3xl">
+          Your handle is already a wallet.
+        </p>
+        <div className="mt-5 flex flex-wrap justify-center gap-3">
+          <a href="/auth/x/login" className="btn btn-gold">
+            <XLogo size={15} /> Continue with X
+          </a>
+          <a href="https://selkiepay.vercel.app" target="_blank" rel="noreferrer" className="btn btn-dim">
+            See it live
+          </a>
+        </div>
+        <div className="mt-6 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm font-semibold text-ivory/55">
+          <a href="https://x.com/SelkiePay" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 hover:text-ivory">
+            <XLogo size={13} /> @SelkiePay
+          </a>
+          <a href="https://t.me/selkiepay_bot" target="_blank" rel="noreferrer" className="hover:text-ivory">
+            @selkiepay_bot
+          </a>
+          <a href="https://github.com/martinvibes/Selkie" target="_blank" rel="noreferrer" className="hover:text-ivory">
+            GitHub
+          </a>
+        </div>
+      </Rise>
+    </div>
+  );
+}
+
+const SLIDES = [SlideTitle, SlideProblem, SlideSolution, SlideSurfaces, SlideCanton, SlideVision];
+const COUNT = SLIDES.length;
+const pad = (n: number) => String(n).padStart(2, "0");
+
+/** Deep-link support: /pitch#4 opens on slide 4, so a presenter can jump in. */
+function slideFromHash() {
+  const n = parseInt(window.location.hash.replace(/\D/g, ""), 10);
+  return Number.isFinite(n) && n >= 1 && n <= COUNT ? n - 1 : 0;
+}
+
+export function Pitch() {
+  const [index, setIndex] = useState(slideFromHash);
+
+  const go = useCallback((d: number) => {
+    setIndex((i) => Math.min(COUNT - 1, Math.max(0, i + d)));
+  }, []);
+
+  // Keep the URL hash in step without piling up history entries.
+  useEffect(() => {
+    history.replaceState(null, "", `#${index + 1}`);
+  }, [index]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "ArrowRight" || e.key === " " || e.key === "PageDown") {
+        e.preventDefault();
+        go(1);
+      } else if (e.key === "ArrowLeft" || e.key === "PageUp") {
+        e.preventDefault();
+        go(-1);
+      } else if (e.key === "Home") {
+        setIndex(0);
+      } else if (e.key === "End") {
+        setIndex(COUNT - 1);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [go]);
+
+  const atStart = index === 0;
+  const atEnd = index === COUNT - 1;
 
   return (
-    <>
-      <Header />
+    <div className="deck">
+      {/* ambient light, behind the slides */}
+      <span className="orb -left-24 top-10 h-72 w-72 bg-gold/20" style={{ animation: "drift 9s ease-in-out infinite" }} />
+      <span className="orb -right-20 bottom-8 h-80 w-80 bg-[#7ebed4]/12" style={{ animation: "drift 11s ease-in-out infinite reverse" }} />
 
-      <main className="pb-8 pt-6 sm:pt-10">
-        <Shell wide>
-          {/* ---- hero ---- */}
-          <section className="pt-8 sm:pt-14">
-            <Reveal>
-              <span className="chunk inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 text-xs font-bold">
-                <span className="pulse-dot h-1.5 w-1.5 rounded-full bg-gold-deep" />
-                The pitch · HackCanton Season 2
-              </span>
-              <h1 className="mt-6 max-w-4xl font-display text-[clamp(2.7rem,6.2vw,4.6rem)] font-bold leading-[1.03] tracking-[-0.03em] text-ivory text-balance">
-                The wallet is already yours.
-                <br />
-                <span className="text-gold-grad">It is just your handle.</span>
-              </h1>
-              <p className="mt-6 max-w-xl text-[1.05rem] leading-relaxed text-ivory/70">
-                Selkie turns any X or Telegram handle into a private wallet on the Canton Network.
-                Send CC, USDCx, cBTC or cETH to @anyone. No app, no seed phrase, no gas, no public
-                balance. If they have never used Selkie, your payment opens their wallet the moment
-                it lands.
-              </p>
-              <div className="mt-9 flex flex-wrap items-center gap-3.5">
-                {cta}
-                <a
-                  href="https://selkiepay.vercel.app"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="btn btn-dim"
-                >
-                  See it live <ArrowUpRight size={16} />
-                </a>
-                <Link
-                  to="/docs"
-                  className="text-sm font-semibold text-ivory/70 underline-offset-4 hover:text-ivory hover:underline"
-                >
-                  Read the docs
-                </Link>
-              </div>
-            </Reveal>
-          </section>
+      {/* top bar: brand + slide counter */}
+      <div className="absolute inset-x-0 top-0 z-30 flex items-center justify-between px-5 py-5 sm:px-8">
+        <Wordmark />
+        <span className="num flex items-baseline gap-1 text-ivory">
+          <span className="text-xl font-bold sm:text-2xl">{pad(index + 1)}</span>
+          <span className="text-sm font-semibold text-ivory/40">/ {pad(COUNT)}</span>
+        </span>
+      </div>
 
-          {/* ---- the problem ---- */}
-          <section className="pt-24">
-            <Lead
-              eyebrow="The problem"
-              title="Crypto keeps losing normal people at the same wall."
-              sub="Two walls, actually. Most people quit at the first. The ones who make it past hit the second and never notice what it costs them."
-            />
-            <div className="mt-10 grid gap-6 md:grid-cols-2">
-              <Reveal variant="left">
-                <div className="chunk h-full p-7">
-                  <span className="grid h-11 w-11 place-items-center rounded-xl border-2 border-pen bg-[#f7ecd2] text-gold-ink">
-                    <Lock size={19} />
-                  </span>
-                  <h3 className="mt-5 font-display text-lg font-bold">The friction wall</h3>
-                  <p className="mt-2 text-sm font-medium leading-relaxed text-pen/65">
-                    Install a wallet. Write down twelve words. Buy gas. Then paste a
-                    forty-character address you cannot read and hope you got it right. It is a lot
-                    of homework just to send a friend five dollars, and most people quit right here.
-                  </p>
-                </div>
-              </Reveal>
-              <Reveal variant="right" delay={120}>
-                <div className="chunk h-full p-7">
-                  <span className="grid h-11 w-11 place-items-center rounded-xl border-2 border-pen bg-[#f7ecd2] text-gold-ink">
-                    <EyeOff size={19} />
-                  </span>
-                  <h3 className="mt-5 font-display text-lg font-bold">The privacy wall</h3>
-                  <p className="mt-2 text-sm font-medium leading-relaxed text-pen/65">
-                    The apps that finally remove that friction run on transparent chains. So every
-                    tip, every balance, every payment turns into public feed data that anyone can
-                    read forever. You get ease or you get privacy. Almost nobody gives you both.
-                  </p>
-                </div>
-              </Reveal>
+      {/* the stage: all slides mounted, positioned by depth state */}
+      <div className="deck-stage">
+        {SLIDES.map((Slide, i) => {
+          const state = i === index ? "is-active" : i < index ? "is-past" : "is-future";
+          return (
+            <div key={i} className={`deck-slide ${state}`} aria-hidden={i !== index}>
+              <span className="deck-figure">{pad(i + 1)}</span>
+              <Slide />
             </div>
-          </section>
+          );
+        })}
+      </div>
 
-          {/* ---- the solution ---- */}
-          <section className="pt-24">
-            <Lead
-              eyebrow="The solution"
-              title={
-                <>
-                  Your handle is the wallet.
-                  <br className="hidden sm:block" /> The ledger keeps it private.
-                </>
-              }
-              sub="Selkie removes both walls at once, because it was built on the one network where privacy is the default and real assets are native."
-            />
-            <div className="mt-10 grid gap-6 md:grid-cols-3">
-              {[
-                {
-                  icon: <AtSign size={19} />,
-                  t: "The handle is the address",
-                  d: "There is nothing to install and nothing to back up. Your @name is the account.",
-                },
-                {
-                  icon: <EyeOff size={19} />,
-                  t: "Private by default",
-                  d: "Amounts and balances are visible only to the two people in a payment. No public feed.",
-                },
-                {
-                  icon: <Sparkles size={19} />,
-                  t: "The payment is the onboarding",
-                  d: "Pay someone new and the payment itself opens their wallet. The money is already theirs.",
-                },
-              ].map((c, i) => (
-                <Reveal key={c.t} delay={i * 120} variant={i === 0 ? "left" : i === 1 ? "pop" : "right"}>
-                  <div className="chunk h-full p-7">
-                    <span className="grid h-11 w-11 place-items-center rounded-xl border-2 border-pen bg-[#f7ecd2] text-gold-ink">
-                      {c.icon}
-                    </span>
-                    <h3 className="mt-5 font-display text-lg font-bold">{c.t}</h3>
-                    <p className="mt-2 text-sm font-medium leading-relaxed text-pen/65">{c.d}</p>
-                  </div>
-                </Reveal>
-              ))}
-            </div>
+      {/* bottom bar: prev, progress segments, next */}
+      <div className="absolute inset-x-0 bottom-0 z-30 flex items-center justify-between gap-4 px-5 py-6 sm:px-8">
+        <button
+          onClick={() => go(-1)}
+          disabled={atStart}
+          aria-label="Previous slide"
+          className="btn btn-dim btn-sm !h-11 !w-11 !p-0 disabled:opacity-30"
+        >
+          <ArrowLeft size={17} />
+        </button>
 
-            {/* the one-line thesis */}
-            <Reveal variant="pop">
-              <div className="chunk-gold mt-6 overflow-hidden p-8 text-center sm:p-12">
-                <p className="eyebrow text-gold-ink/70">The whole product</p>
-                <p className="mt-3 font-mono text-[clamp(1.4rem,4vw,2.2rem)] font-bold text-pen">
-                  send 5 CC to @ada
-                </p>
-                <p className="mx-auto mt-4 max-w-md font-medium text-pen/70">
-                  That is the entire thing. One line moves money to a name. If @ada is new, her
-                  wallet appears mid-payment.
-                </p>
-              </div>
-            </Reveal>
-          </section>
+        <div className="flex items-center gap-2" role="tablist" aria-label="Slides">
+          {SLIDES.map((_, i) => (
+            <button
+              key={i}
+              onClick={() => setIndex(i)}
+              aria-label={`Go to slide ${i + 1}`}
+              aria-selected={i === index}
+              role="tab"
+              className={`deck-seg ${i === index ? "on" : i < index ? "done" : ""}`}
+            >
+              <span />
+            </button>
+          ))}
+        </div>
 
-          {/* ---- three surfaces ---- */}
-          <section className="pt-24">
-            <Lead
-              eyebrow="Three ways in, one wallet"
-              title="Wherever people already talk, Selkie can pay."
-              sub="X, Telegram and the web share one wallet grammar. Learn it once and it works on every surface."
-            />
-            <div className="mt-10 grid gap-6 md:grid-cols-3">
-              {SURFACES.map((s, i) => (
-                <Reveal key={s.tag} delay={i * 120} variant="pop">
-                  <div className="chunk chunk-pop flex h-full flex-col p-7">
-                    <span className="grid h-11 w-11 place-items-center rounded-xl border-2 border-pen bg-[#f7ecd2] text-gold-ink">
-                      {s.icon}
-                    </span>
-                    <p className="eyebrow mt-5 text-gold-ink/70">{s.tag}</p>
-                    <h3 className="mt-1 font-display text-lg font-bold">{s.title}</h3>
-                    <p className="mt-2 flex-1 text-sm font-medium leading-relaxed text-pen/65">{s.body}</p>
-                    <div className="mt-4">{s.demo}</div>
-                  </div>
-                </Reveal>
-              ))}
-            </div>
-          </section>
-
-          {/* ---- why canton ---- */}
-          <section className="pt-24">
-            <Lead
-              eyebrow="Why Canton"
-              title="Three things a payments app cannot fake."
-              sub="Selkie needs real privacy, real assets and settlement a normal person never has to think about. Canton is the network that offers all three at once."
-            />
-            <div className="mt-10 grid gap-6 md:grid-cols-3">
-              {WHY_CANTON.map((c, i) => (
-                <Reveal key={c.t} delay={i * 120} variant="pop">
-                  <div className="chunk h-full p-7">
-                    <span className="grid h-11 w-11 place-items-center rounded-xl border-2 border-pen bg-[#f7ecd2] text-gold-ink">
-                      {c.icon}
-                    </span>
-                    <h3 className="mt-5 font-display text-lg font-bold">{c.t}</h3>
-                    <p className="mt-2 text-sm font-medium leading-relaxed text-pen/65">{c.d}</p>
-                  </div>
-                </Reveal>
-              ))}
-            </div>
-          </section>
-
-          {/* ---- proof ---- */}
-          <section className="pt-24">
-            <Lead
-              eyebrow="Proof it is real"
-              title="Not a slideshow. A live wallet on Canton."
-              sub="Everything on this page settles on real Canton contracts today."
-            />
-            <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-              {PROOF.map((p, i) => (
-                <Reveal key={p.t} delay={i * 90} variant="pop">
-                  <div className="chunk h-full p-5">
-                    <span className="grid h-9 w-9 place-items-center rounded-full border-2 border-pen bg-[#f7ecd2] text-gold-ink">
-                      {p.icon}
-                    </span>
-                    <p className="mt-3 text-sm font-bold">{p.t}</p>
-                    <p className="mt-1 text-[13px] font-medium leading-relaxed text-pen/55">{p.d}</p>
-                  </div>
-                </Reveal>
-              ))}
-            </div>
-
-            <Reveal>
-              <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
-                {["CC", "USDCX", "CBTC", "CETH"].map((a) => (
-                  <span
-                    key={a}
-                    className="chunk inline-flex items-center gap-2 rounded-full px-3.5 py-2 text-sm font-bold"
-                  >
-                    <TokenIcon asset={a} size={20} />
-                    {a === "CC" ? "Canton Coin" : a === "USDCX" ? "USDCx" : a === "CBTC" ? "cBTC" : "cETH"}
-                  </span>
-                ))}
-              </div>
-            </Reveal>
-          </section>
-
-          {/* ---- vision ---- */}
-          <section className="pt-24">
-            <Lead
-              eyebrow="Where this goes"
-              title="A handle that pays is a platform, not a feature."
-              sub="Once a handle is an account and privacy is the default, the same foundation opens onto much bigger things."
-            />
-            <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-              {VISION.map((v, i) => (
-                <Reveal key={v.t} delay={i * 90} variant="pop">
-                  <div className="chunk chunk-pop h-full p-5">
-                    <span className="grid h-9 w-9 place-items-center rounded-full border-2 border-pen bg-[#f7ecd2] text-gold-ink">
-                      {v.icon}
-                    </span>
-                    <p className="mt-3 text-sm font-bold">{v.t}</p>
-                    <p className="mt-1 text-[13px] font-medium leading-relaxed text-pen/55">{v.d}</p>
-                  </div>
-                </Reveal>
-              ))}
-            </div>
-          </section>
-
-          {/* ---- closing CTA ---- */}
-          <section className="pt-24">
-            <Reveal variant="pop">
-              <div className="chunk-gold overflow-hidden p-10 text-center sm:p-14">
-                <h2 className="font-display text-[clamp(1.9rem,4.5vw,2.9rem)] font-bold tracking-tight text-pen text-balance">
-                  Your handle is already a wallet.
-                </h2>
-                <p className="mx-auto mt-3 max-w-md font-medium text-pen/70">
-                  Claim it in one tap, or pay someone who has not claimed theirs yet. It settles on
-                  Canton in seconds, and it stays private.
-                </p>
-                <div className="mt-8 flex flex-wrap justify-center gap-3.5">
-                  {cta}
-                  <Link to="/docs" className="btn btn-dark">
-                    <BookOpen size={16} /> Read the docs
-                  </Link>
-                </div>
-                <div className="mt-8 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm font-semibold text-pen/70">
-                  <a
-                    href="https://t.me/selkiepay_bot"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center gap-1.5 hover:text-pen"
-                  >
-                    <Send size={14} /> @selkiepay_bot
-                  </a>
-                  <a
-                    href="https://x.com/SelkiePay"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center gap-1.5 hover:text-pen"
-                  >
-                    <XLogo size={13} /> @SelkiePay
-                  </a>
-                  <a
-                    href="https://github.com/martinvibes/Selkie"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center gap-1.5 hover:text-pen"
-                  >
-                    GitHub
-                  </a>
-                </div>
-              </div>
-            </Reveal>
-          </section>
-        </Shell>
-      </main>
-
-      <Footer />
-    </>
+        {atEnd ? (
+          <a
+            href="https://selkiepay.vercel.app"
+            target="_blank"
+            rel="noreferrer"
+            className="btn btn-gold btn-sm !h-11"
+          >
+            <Sparkles size={15} /> Live app
+          </a>
+        ) : (
+          <button onClick={() => go(1)} className="btn btn-gold btn-sm !h-11">
+            Next <ArrowRight size={16} />
+          </button>
+        )}
+      </div>
+    </div>
   );
 }
