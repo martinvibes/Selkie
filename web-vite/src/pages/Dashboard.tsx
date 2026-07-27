@@ -86,12 +86,14 @@ function HeroCard({
   const cc = balances.CC ?? 0;
   return (
     <section className="chunk-gold p-6 sm:p-7">
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3.5">
+      <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex min-w-0 items-center gap-3.5">
           <Avatar me={me} size={46} />
-          <div className="leading-tight">
+          <div className="min-w-0 leading-tight">
             <p className="eyebrow">Private wallet · Canton</p>
-            <h1 className="mt-0.5 font-display text-2xl font-bold tracking-tight">{me.handle}</h1>
+            <h1 className="mt-0.5 break-words font-display text-2xl font-bold tracking-tight">
+              {me.handle}
+            </h1>
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-2">
