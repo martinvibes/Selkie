@@ -1,32 +1,38 @@
-// Real token marks, drawn inline so they work offline and never hit a CDN.
-// BTC, ETH and USDC are the canonical logos; Canton Coin gets a coin built
-// from Canton's angular nested-C geometry.
+// Real token marks, kept local so they work offline and never hit a CDN.
+// cETH (onRails) and Canton Coin (Canton Foundation) ship as the issuers' own
+// brand logos, bundled as assets and clipped to a circle. cBTC carries
+// BitSafe's angular B on their orange coin; USDC is the canonical mark. Every
+// asset renders as the same circular coin at any size.
+import cantonCoinLogo from "../assets/tokens/canton-coin.png";
+import cethLogo from "../assets/tokens/ceth.png";
 
 const CIRCLE = { cx: 16, cy: 16, r: 16 } as const;
+const SHADOW = { boxShadow: "0 4px 12px -4px rgba(0,0,0,0.5)" } as const;
 
-function Btc() {
+// Bundled brand logos, rendered as <img> and clipped to a circle.
+const LOGO: Record<string, string> = {
+  CC: cantonCoinLogo,
+  CETH: cethLogo,
+};
+
+/** cBTC: BitSafe's orange coin carrying their angular B mark in white. */
+function Cbtc() {
   return (
     <>
-      <circle {...CIRCLE} fill="#F7931A" />
-      <path
-        fill="#fff"
-        d="M23.189 14.02c.314-2.096-1.283-3.223-3.465-3.975l.708-2.84-1.728-.43-.69 2.765c-.454-.114-.92-.22-1.385-.326l.695-2.783L15.596 6l-.708 2.839c-.376-.086-.746-.17-1.104-.26l.002-.009-2.384-.595-.46 1.846s1.283.294 1.256.312c.7.175.826.638.805 1.006l-.806 3.235c.048.012.11.03.18.057l-.183-.045-1.13 4.532c-.086.212-.303.531-.793.41.018.025-1.256-.313-1.256-.313l-.858 1.978 2.25.561c.418.105.828.215 1.231.318l-.715 2.872 1.727.43.708-2.84c.472.127.93.245 1.378.357l-.706 2.828 1.728.43.715-2.866c2.948.558 5.164.333 6.097-2.333.752-2.146-.037-3.385-1.588-4.192 1.13-.26 1.98-1.003 2.207-2.538zm-3.95 5.538c-.533 2.147-4.148.986-5.32.695l.95-3.805c1.172.293 4.929.872 4.37 3.11zm.535-5.569c-.487 1.953-3.495.96-4.47.717l.86-3.45c.975.243 4.118.696 3.61 2.733z"
+      <circle {...CIRCLE} fill="#F4652F" />
+      <circle
+        cx="16"
+        cy="16"
+        r="14.4"
+        fill="none"
+        stroke="#fff"
+        strokeOpacity="0.3"
+        strokeWidth="1.1"
       />
-    </>
-  );
-}
-
-function Eth() {
-  return (
-    <>
-      <circle {...CIRCLE} fill="#627EEA" />
-      <g fill="#fff">
-        <path fillOpacity="0.602" d="M16.498 4v8.87l7.497 3.35z" />
-        <path d="M16.498 4L9 16.22l7.498-3.35z" />
-        <path fillOpacity="0.602" d="M16.498 21.968v6.027L24 17.616z" />
-        <path d="M16.498 27.995v-6.028L9 17.616z" />
-        <path fillOpacity="0.2" d="M16.498 20.573l7.497-4.353-7.497-3.348z" />
-        <path fillOpacity="0.602" d="M9 16.22l7.498 4.353v-7.701z" />
+      <g transform="translate(7.3 6.95) scale(0.5)" fill="#fff">
+        <path d="M6.74898 0.598145H2.71986e-05V10.3442H6.74898V0.598145Z" />
+        <path d="M2.71986e-05 35.5981H6.74898V25.8445H0L2.71986e-05 35.5981Z" />
+        <path d="M28.4281 15.1836C32.0977 16.219 34.7734 19.5937 34.7734 23.6203C34.7734 28.4906 30.8363 32.4021 26.02 32.4021H17.7697V35.5981H11.0207V25.8445H24.7586C25.9818 25.8445 26.9756 24.8474 26.9756 23.6203C26.9756 22.3931 25.9818 21.3961 24.7586 21.3961H0V14.8001H18.7956C20.0188 14.8001 21.0126 13.803 21.0126 12.5759C21.0126 11.3487 20.0188 10.3516 18.7956 10.3516L17.7697 10.3442H11.0207V0.598145H17.7697V3.79403H20.057C24.8733 3.79403 28.8104 7.74394 28.8104 12.5759C28.8104 13.4962 28.6575 14.3783 28.4281 15.1836Z" />
       </g>
     </>
   );
@@ -44,29 +50,28 @@ function Usdc() {
   );
 }
 
-/** Canton Coin: an ivory coin carrying Canton's nested angular C. */
-function CantonCoin() {
-  return (
-    <>
-      <circle {...CIRCLE} fill="#F4F1EA" />
-      <circle cx="16" cy="16" r="15.1" fill="none" stroke="rgba(13,46,82,0.2)" strokeWidth="1.4" />
-      <g fill="none" stroke="#0D2E52" strokeWidth="2.8">
-        <path d="M22.6 8.9h-8.4c-4 0-6.5 2.5-6.5 6v2.2c0 3.5 2.5 6 6.5 6h8.4" />
-        <path d="M22.6 14h-7.2c-1.3 0-2.2.85-2.2 2s.9 2 2.2 2h7.2" />
-      </g>
-    </>
-  );
-}
-
-const TOKENS: Record<string, () => React.ReactNode> = {
-  CC: CantonCoin,
+const SVG_TOKENS: Record<string, () => React.ReactNode> = {
+  CBTC: Cbtc,
   USDCX: Usdc,
-  CBTC: Btc,
-  CETH: Eth,
 };
 
 export function TokenIcon({ asset, size = 32 }: { asset: string; size?: number }) {
-  const Body = TOKENS[asset];
+  const logo = LOGO[asset];
+  if (logo) {
+    return (
+      <img
+        src={logo}
+        width={size}
+        height={size}
+        alt=""
+        aria-hidden="true"
+        className="shrink-0 rounded-full object-cover"
+        style={SHADOW}
+      />
+    );
+  }
+
+  const Body = SVG_TOKENS[asset];
   return (
     <svg
       width={size}
@@ -74,7 +79,7 @@ export function TokenIcon({ asset, size = 32 }: { asset: string; size?: number }
       viewBox="0 0 32 32"
       aria-hidden="true"
       className="shrink-0 rounded-full"
-      style={{ boxShadow: "0 4px 12px -4px rgba(0,0,0,0.5)" }}
+      style={SHADOW}
     >
       {Body ? (
         <Body />
