@@ -99,6 +99,7 @@ if (xKeys.apiKey && xKeys.apiSecret && xKeys.accessToken && xKeys.accessSecret) 
       : new History(process.env.SELKIE_HISTORY ?? join(here, "../../.data/history.jsonl"));
   const worker = new XWorker({
     ...xKeys,
+    pollSeconds: Number(process.env.X_POLL_SECONDS) || 30,
     wallet,
     history: xHistory,
     webUrl: process.env.SELKIE_WEB_URL || "https://selkiepay.vercel.app",

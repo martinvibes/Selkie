@@ -63,7 +63,7 @@ export class XWorker {
     wallet,
     history = null,
     webUrl = "https://selkiepay.vercel.app",
-    pollSeconds = 10,
+    pollSeconds = 30,
     state = {},
     saveState = null,
     log = console.log,

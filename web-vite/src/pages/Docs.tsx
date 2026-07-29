@@ -236,8 +236,8 @@ export function Docs() {
                 <p>
                   This is where Selkie started. You can pay anyone straight from a post: write a
                   tweet that tags <span className="font-semibold text-pen">@SelkiePay</span> with
-                  what you want to do. Selkie reads it, settles it on Canton in seconds, and replies
-                  to you with a private receipt you can open in your wallet.
+                  what you want to do. Selkie reads it, settles it on Canton, and replies
+                  to you within a minute with a private receipt you can open in your wallet.
                 </p>
 
                 <div className="grid gap-3 sm:grid-cols-2">
@@ -269,7 +269,7 @@ export function Docs() {
                     <ol className="mt-2.5 space-y-2 text-sm text-pen/65">
                       {[
                         "Post or reply with a command that tags @SelkiePay.",
-                        "Selkie settles it on Canton and replies to you in about ten seconds.",
+                        "Selkie settles it on Canton and replies to you within a minute.",
                         "Tap the receipt link in the reply, or open your wallet any time to see it.",
                       ].map((s, i) => (
                         <li key={s} className="flex gap-2.5">
