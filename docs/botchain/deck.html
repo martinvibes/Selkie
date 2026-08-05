@@ -1,0 +1,551 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Selkie — BOT Chain Ecosystem Support Program</title>
+<style>
+  @page { size: 13.333in 7.5in; margin: 0; }
+
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+
+  :root {
+    --bg:#0B0912;
+    --ink:#F2EBDC;
+    --gold:#F6DFA4;
+    --gold-deep:#C9964B;
+    --dim:rgba(242,235,220,.58);
+    --dimmer:rgba(242,235,220,.40);
+    --line:rgba(242,235,220,.14);
+    --panel:rgba(242,235,220,.045);
+  }
+
+  body {
+    font-family:"Avenir Next","Helvetica Neue",Arial,sans-serif;
+    background:var(--bg); color:var(--ink);
+    -webkit-font-smoothing:antialiased;
+  }
+
+  .slide {
+    width:13.333in; height:7.5in;
+    padding:0.78in 0.92in;
+    position:relative; overflow:hidden;
+    background:var(--bg);
+    page-break-after:always;
+    display:flex; flex-direction:column;
+  }
+  .slide:last-child { page-break-after:auto; }
+
+  /* corner echo mark */
+  .echo { position:absolute; right:-0.9in; bottom:-1.25in; opacity:1; }
+  .bloom {
+    position:absolute; right:-1.6in; bottom:-2in;
+    width:6.5in; height:6.5in; border-radius:50%;
+    background:radial-gradient(circle, rgba(246,223,164,.085) 0%, rgba(246,223,164,0) 62%);
+  }
+
+  .num {
+    position:absolute; top:0.5in; right:0.62in;
+    font-size:11pt; font-weight:700; color:rgba(242,235,220,.26);
+    letter-spacing:.08em;
+  }
+
+  .eyebrow {
+    font-size:10.5pt; font-weight:800; letter-spacing:.22em;
+    text-transform:uppercase; color:var(--gold-deep);
+  }
+
+  h1 { font-size:46pt; font-weight:800; line-height:1.02; letter-spacing:-.025em; }
+  h2 { font-size:31pt; font-weight:800; line-height:1.08; letter-spacing:-.02em; }
+  .grad {
+    background:linear-gradient(120deg,var(--gold),var(--gold-deep));
+    -webkit-background-clip:text; background-clip:text; color:transparent;
+  }
+
+  .lede { font-size:14.5pt; line-height:1.5; color:var(--dim); font-weight:500; max-width:8.2in; }
+  .body { font-size:11.5pt; line-height:1.5; color:var(--dim); font-weight:500; }
+
+  .head { margin-bottom:.42in; }
+  .head h2 { margin-top:.10in; }
+  .fill { flex:1; display:flex; flex-direction:column; justify-content:center; }
+
+  /* cards */
+  .cards { display:flex; gap:.26in; align-items:stretch; }
+  .card {
+    flex:1; border:1.5px solid var(--line); border-radius:.17in;
+    background:var(--panel); padding:.32in .3in;
+  }
+  .card .t { font-size:13.5pt; font-weight:800; letter-spacing:-.01em; margin-bottom:.09in; }
+  .card .d { font-size:10.5pt; line-height:1.48; color:var(--dim); font-weight:500; }
+  .card .tag {
+    font-size:8.5pt; font-weight:800; letter-spacing:.16em; text-transform:uppercase;
+    color:var(--gold-deep); margin-bottom:.13in;
+  }
+
+  /* the command chip */
+  .cmd {
+    display:inline-block; border:1.5px solid rgba(242,235,220,.2); border-radius:.16in;
+    background:rgba(242,235,220,.05); padding:.26in .4in;
+    font-family:"SF Mono",Menlo,monospace; font-size:26pt; font-weight:500; line-height:1;
+  }
+  .cmd .at { color:var(--gold); }
+  .cmd.sm { font-size:12pt; padding:.13in .2in; border-radius:.1in; }
+
+  /* stat rows */
+  .stats { display:flex; flex-wrap:wrap; gap:.22in; }
+  .stat {
+    width:calc(50% - .11in);
+    border-left:2.5px solid var(--gold-deep);
+    padding:.05in 0 .05in .22in;
+  }
+  .stat .n { font-size:20pt; font-weight:800; letter-spacing:-.02em; color:var(--ink); }
+  .stat .l { font-size:10pt; line-height:1.4; color:var(--dim); font-weight:500; margin-top:.04in; }
+
+  /* flow steps */
+  .flow { display:flex; align-items:stretch; gap:.16in; }
+  .step {
+    flex:1; border:1.5px solid var(--line); border-radius:.16in;
+    background:var(--panel); padding:.3in .26in; position:relative;
+  }
+  .step .k {
+    width:.34in; height:.34in; border-radius:50%;
+    background:linear-gradient(135deg,var(--gold),var(--gold-deep));
+    color:#0B0912; font-size:11pt; font-weight:800;
+    display:flex; align-items:center; justify-content:center; margin-bottom:.16in;
+  }
+  .step .t { font-size:12pt; font-weight:800; margin-bottom:.07in; }
+  .step .d { font-size:10pt; line-height:1.45; color:var(--dim); font-weight:500; }
+  .arrow { display:flex; align-items:center; color:var(--gold-deep); font-size:15pt; font-weight:700; }
+
+  /* stack diagram */
+  .stack { display:flex; flex-direction:column; gap:.11in; }
+  .layer {
+    border:1.5px solid var(--line); border-radius:.13in;
+    padding:.19in .28in; display:flex; align-items:center; justify-content:space-between;
+    background:var(--panel);
+  }
+  .layer .n { font-size:12pt; font-weight:700; }
+  .layer .m { font-size:9.5pt; font-weight:700; letter-spacing:.09em; text-transform:uppercase; }
+  .layer.keep { border-color:rgba(246,223,164,.32); background:rgba(246,223,164,.07); }
+  .layer.keep .m { color:var(--gold); }
+  .layer.port { border-color:rgba(201,150,75,.55); background:rgba(201,150,75,.14); }
+  .layer.port .m { color:var(--gold); }
+
+  .pills { display:flex; flex-wrap:wrap; gap:.14in; }
+  .pill {
+    border:1.5px solid var(--line); border-radius:99px;
+    padding:.12in .26in; font-size:10.5pt; font-weight:700; color:var(--dim);
+  }
+  .pill.on { border-color:rgba(246,223,164,.4); color:var(--gold); background:rgba(246,223,164,.08); }
+
+  .foot {
+    position:absolute; left:.92in; right:.92in; bottom:.46in;
+    display:flex; justify-content:space-between; align-items:center;
+    font-size:9.5pt; font-weight:600; color:rgba(242,235,220,.34);
+    border-top:1px solid rgba(242,235,220,.10); padding-top:.16in;
+  }
+
+  .wordmark { display:flex; align-items:center; gap:.14in; }
+  .wordmark .w { font-size:13pt; font-weight:800; letter-spacing:.26em; }
+</style>
+</head>
+<body>
+
+<!-- ============ 1 · TITLE ============ -->
+<section class="slide">
+  <div class="bloom"></div>
+  <svg class="echo" width="700" height="700" viewBox="0 0 820 820">
+    <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#F6DFA4"/><stop offset="1" stop-color="#C9964B"/></linearGradient></defs>
+    <g stroke-linejoin="round" stroke-width="66">
+      <path d="M 150 250 L 150 570 L 420 410 Z" fill="#F2EBDC" stroke="#F2EBDC" opacity="0.06"/>
+      <path d="M 285 250 L 285 570 L 555 410 Z" fill="#F2EBDC" stroke="#F2EBDC" opacity="0.11"/>
+      <path d="M 420 250 L 420 570 L 690 410 Z" fill="url(#g)" stroke="url(#g)" opacity="0.26"/>
+    </g>
+  </svg>
+
+  <div class="wordmark">
+    <svg width="40" height="40" viewBox="0 0 220 220">
+      <defs><linearGradient id="g2" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" stop-color="#F6DFA4"/><stop offset="1" stop-color="#C9964B"/></linearGradient></defs>
+      <g stroke-linejoin="round" stroke-width="26">
+        <path d="M 26 62 L 26 158 L 108 110 Z" fill="#F2EBDC" stroke="#F2EBDC" opacity="0.18"/>
+        <path d="M 68 62 L 68 158 L 150 110 Z" fill="#F2EBDC" stroke="#F2EBDC" opacity="0.42"/>
+        <path d="M 110 62 L 110 158 L 192 110 Z" fill="url(#g2)" stroke="url(#g2)"/>
+      </g>
+    </svg>
+    <span class="w">SELKIE</span>
+  </div>
+
+  <div class="fill">
+    <p class="eyebrow">BOT Chain Ecosystem Support Program</p>
+    <h1 style="margin-top:.18in">Any handle<br>is a <span class="grad">wallet.</span></h1>
+    <p class="lede" style="margin-top:.28in; max-width:6.6in">
+      Selkie pays people who have never installed a wallet. The payment itself creates
+      their account — so agents, apps and communities can pay a human by name, in one line.
+    </p>
+    <div style="margin-top:.34in"><span class="cmd">send 5 CC to <span class="at">@ada</span></span></div>
+  </div>
+
+  <div class="foot">
+    <span>Live on Canton DevNet · Applying to deploy natively on BOT Chain</span>
+    <span>selkiepay.vercel.app</span>
+  </div>
+</section>
+
+<!-- ============ 2 · PROBLEM ============ -->
+<section class="slide">
+  <span class="num">02</span>
+  <div class="head">
+    <p class="eyebrow">The problem</p>
+    <h2>Agents can't onboard humans.</h2>
+  </div>
+  <div class="fill">
+    <p class="lede" style="margin-bottom:.36in">
+      Every system that needs to pay a person — an AI agent settling a bounty, a protocol
+      running rewards, a community paying contributors — hits the same wall. The recipient
+      has no wallet, and nothing can walk them through creating one.
+    </p>
+    <div class="cards">
+      <div class="card">
+        <p class="tag">Wall one</p>
+        <p class="t">The claim step</p>
+        <p class="d">Install a wallet. Write down twelve words. Buy gas. Paste a forty-character
+          address you cannot read. Most people quit here — and 20–40% of all reward and airdrop
+          value is never collected as a result.</p>
+      </div>
+      <div class="card">
+        <p class="tag">Wall two</p>
+        <p class="t">Gas economics</p>
+        <p class="d">Social payments are small payments. On most chains a $0.50 tip costs more
+          in fees than it delivers, so consumer payments have never worked at scale — the
+          economics forbid it before the UX even matters.</p>
+      </div>
+      <div class="card">
+        <p class="tag">Wall three</p>
+        <p class="t">No addressing layer</p>
+        <p class="d">Autonomous agents can transact with contracts, but they cannot resolve
+          "pay this person." There is no identity-addressed payment rail between agents and
+          the humans who do work for them.</p>
+      </div>
+    </div>
+    <p style="margin-top:.34in; font-size:14pt; font-weight:700; color:var(--ink)">
+      An agent economy that cannot pay people is not an economy.
+    </p>
+  </div>
+</section>
+
+<!-- ============ 3 · SOLUTION ============ -->
+<section class="slide">
+  <span class="num">03</span>
+  <div class="bloom"></div>
+  <div class="head">
+    <p class="eyebrow">The solution</p>
+    <h2>The payment creates the wallet.</h2>
+  </div>
+  <div class="fill">
+    <div style="text-align:center; margin-bottom:.42in">
+      <span class="cmd">send 5 CC to <span class="at">@ada</span></span>
+      <p class="body" style="margin-top:.22in; font-size:12pt">
+        One line, sent to a bot. @ada has never heard of Selkie.
+      </p>
+    </div>
+    <div class="flow">
+      <div class="step">
+        <div class="k">1</div>
+        <p class="t">A handle is named</p>
+        <p class="d">No address, no lookup, no invite. The recipient is identified the same
+          way people already identify each other.</p>
+      </div>
+      <div class="arrow">→</div>
+      <div class="step">
+        <div class="k">2</div>
+        <p class="t">Account opens mid-transfer</p>
+        <p class="d">If the handle has no account, one is created inside the same atomic
+          transaction that pays it. A rollback leaves no orphan.</p>
+      </div>
+      <div class="arrow">→</div>
+      <div class="step">
+        <div class="k">3</div>
+        <p class="t">The money is simply there</p>
+        <p class="d">Nothing to claim, install, or sign. They sign in later with the handle
+          they already own and the balance is waiting.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 4 · SURFACES ============ -->
+<section class="slide">
+  <span class="num">04</span>
+  <div class="head">
+    <p class="eyebrow">Three surfaces, one core</p>
+    <h2>Payments where people already talk.</h2>
+  </div>
+  <div class="fill">
+    <div class="cards">
+      <div class="card">
+        <p class="tag">On X</p>
+        <p class="t">Pay from the timeline</p>
+        <p class="d">Reply to @SelkiePay in any post. Selkie settles it and replies with a
+          receipt. Every payment is a public mention of a wallet that did not exist before.</p>
+        <div style="margin-top:.2in"><span class="cmd sm">send 5 CC to @ada</span></div>
+      </div>
+      <div class="card">
+        <p class="tag">On Telegram</p>
+        <p class="t">Pay from a chat</p>
+        <p class="d">Open @selkiepay_bot and tap start. Your Telegram username is the wallet,
+          with a button menu for people who never type commands.</p>
+        <div style="margin-top:.2in"><span class="cmd sm">send 10 USDCx to @ada</span></div>
+      </div>
+      <div class="card">
+        <p class="tag">On the web</p>
+        <p class="t">The full wallet</p>
+        <p class="d">Sign in with X for balances, sends, requests, activity, bulk campaigns and
+          a shareable pay-page for any handle.</p>
+        <div style="margin-top:.2in"><span class="cmd sm">selkiepay.vercel.app</span></div>
+      </div>
+    </div>
+    <p class="body" style="margin-top:.34in; font-size:12pt">
+      All three route through a single dispatch layer, so a fourth surface — or an agent-facing
+      API — is a driver, not a rewrite.
+    </p>
+  </div>
+</section>
+
+<!-- ============ 5 · PROOF ============ -->
+<section class="slide">
+  <span class="num">05</span>
+  <div class="head">
+    <p class="eyebrow">Proven, not promised</p>
+    <h2>Everything here is already running.</h2>
+  </div>
+  <div class="fill">
+    <div class="stats">
+      <div class="stat">
+        <p class="n">20 / 20 paid · 0 unclaimed</p>
+        <p class="l">A 20-winner reward campaign settled on a real public node. 20 wallets
+          created, every recipient had no wallet before the payment landed.</p>
+      </div>
+      <div class="stat">
+        <p class="n">1.9 cBTC · 5.5 cETH</p>
+        <p class="l">Real tokenised assets accepted through the CIP-56 token standard, held at
+          external registrars — verified by live ledger query on 4 Aug 2026.</p>
+      </div>
+      <div class="stat">
+        <p class="n">111 automated tests</p>
+        <p class="l">Run against a live participant node, including a 12-test integration
+          suite that exercises real settlement end to end.</p>
+      </div>
+      <div class="stat">
+        <p class="n">81 contracts · 16 accounts</p>
+        <p class="l">Live on DevNet now, each account at its own distinct party. Three surfaces
+          in production — a reviewer can pay a handle in under 60 seconds, installing nothing.</p>
+      </div>
+    </div>
+    <div class="pills" style="margin-top:.4in">
+      <span class="pill on">Live on Canton DevNet · no mocks</span>
+      <span class="pill">Built at HackCanton Season 2</span>
+      <span class="pill">Open source · github.com/martinvibes/Selkie</span>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 6 · WHY BOT CHAIN ============ -->
+<section class="slide">
+  <span class="num">06</span>
+  <div class="bloom"></div>
+  <div class="head">
+    <p class="eyebrow">Why BOT Chain</p>
+    <h2>The first chain where this is<br>economically possible.</h2>
+  </div>
+  <div class="fill">
+    <div class="cards">
+      <div class="card">
+        <p class="tag">Fees</p>
+        <p class="t">Sub-dollar payments finally clear</p>
+        <p class="d">Near-zero fees and 0.75s blocks are the first economics under which a
+          $0.50 tip or a $2 bounty makes sense. This is the constraint that has blocked
+          consumer crypto payments everywhere else.</p>
+      </div>
+      <div class="card">
+        <p class="tag">Thesis</p>
+        <p class="t">Agents need a human payout rail</p>
+        <p class="d">BOT Chain is building settlement for autonomous agents. Selkie is the
+          last mile from those agents to actual people — the piece that makes agent-to-human
+          payment a category that can exist.</p>
+      </div>
+      <div class="card">
+        <p class="tag">Fit</p>
+        <p class="t">EVM means weeks, not quarters</p>
+        <p class="d">Our on-chain surface is six contracts. EVM compatibility means the port
+          is a focused Solidity implementation against a spec we have already proven in
+          production, not a rebuild.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 7 · THE PORT ============ -->
+<section class="slide">
+  <span class="num">07</span>
+  <div class="head">
+    <p class="eyebrow">What the port actually costs</p>
+    <h2>The hard part is already done.</h2>
+  </div>
+  <div class="fill">
+    <div style="display:flex; gap:.42in; align-items:center">
+      <div style="flex:1.25">
+        <div class="stack">
+          <div class="layer keep"><span class="n">X bot · Telegram bot · Web wallet</span><span class="m">Ports unchanged</span></div>
+          <div class="layer keep"><span class="n">Dispatch core — one shared command parser</span><span class="m">Ports unchanged</span></div>
+          <div class="layer keep"><span class="n">Handle resolution, custody, sessions, campaigns</span><span class="m">Ports unchanged</span></div>
+          <div class="layer port"><span class="n">6 contracts — 307 lines</span><span class="m">Rewrite in Solidity</span></div>
+        </div>
+      </div>
+      <div style="flex:1">
+        <p class="body" style="font-size:11.5pt">
+          Selkie's on-chain surface is deliberately small: <strong style="color:var(--ink)">307
+          lines across six contracts</strong> — Account, Holding, Transfer, Request, Escrow,
+          Rewards.
+        </p>
+        <p class="body" style="font-size:11.5pt; margin-top:.18in">
+          Everything above it is chain-agnostic Node.js and React. A native BOT Chain
+          deployment is a focused Solidity implementation of six contracts whose semantics
+          are already specified and proven against real settlement.
+        </p>
+        <p class="body" style="font-size:11.5pt; margin-top:.18in; color:var(--gold)">
+          We are not asking for funding to find product-market fit. We are asking for support
+          to bring a working product to a chain that fits it.
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 8 · MARKET ============ -->
+<section class="slide">
+  <span class="num">08</span>
+  <div class="head">
+    <p class="eyebrow">Who this is for</p>
+    <h2>Two markets, one primitive.</h2>
+  </div>
+  <div class="fill">
+    <div class="cards">
+      <div class="card">
+        <p class="tag">Market one</p>
+        <p class="t">Agent &amp; protocol payouts</p>
+        <p class="d">Task bounties, data labelling, RLHF work, referral splits, community
+          rewards. Anywhere software must pay a human, the recipient's missing wallet is the
+          bottleneck. One API call with a handle removes it.<br><br>
+          Distribution is the payment itself: every payout publicly names a wallet that did
+          not exist a second earlier.</p>
+      </div>
+      <div class="card">
+        <p class="tag">Market two</p>
+        <p class="t">Emerging-market consumer payments</p>
+        <p class="d">Nigeria first. Our users do not own hardware wallets — they own a phone
+          and a social handle, and that is the entire account model.<br><br>
+          They are reached as recipients, not as signups: a community manager paying 20–50
+          contributors brings 20–50 funded wallets at zero acquisition cost, all of whom
+          arrive already holding a balance.</p>
+      </div>
+    </div>
+    <p style="margin-top:.34in; font-size:13.5pt; font-weight:700; color:var(--ink)">
+      The same contract serves an agent paying a worker and a person paying a friend.
+    </p>
+  </div>
+</section>
+
+<!-- ============ 9 · THE ASK ============ -->
+<section class="slide">
+  <span class="num">09</span>
+  <div class="bloom"></div>
+  <div class="head">
+    <p class="eyebrow">The ask</p>
+    <h2>Option C — Community Growth Support</h2>
+  </div>
+  <div class="fill">
+    <p class="lede" style="margin-bottom:.32in; max-width:9in">
+      Selkie has no token, so DEX liquidity and CEX listing support do not apply. Community
+      growth is both the tier we qualify for and the metric we are built to move: every
+      payment Selkie settles creates a new funded user.
+    </p>
+    <div class="flow">
+      <div class="step">
+        <div class="k">1</div>
+        <p class="t">Deploy natively</p>
+        <p class="d">Six contracts in Solidity on BOT Chain mainnet, with BOT Chain as the
+          default settlement rail for every new Selkie user.</p>
+      </div>
+      <div class="step">
+        <div class="k">2</div>
+        <p class="t">Open the agent API</p>
+        <p class="d">A public pay-by-handle endpoint so any agent on BOT Chain can settle to
+          a human without touching wallet onboarding.</p>
+      </div>
+      <div class="step">
+        <div class="k">3</div>
+        <p class="t">Grow by payout</p>
+        <p class="d">Land through campaign runners and agent operators, whose payouts each
+          bring cohorts of new funded BOT Chain wallets.</p>
+      </div>
+    </div>
+    <p class="body" style="margin-top:.32in; font-size:11pt">
+      Gas rebates matter disproportionately here: our transaction profile is high-count and
+      low-value, which is exactly the shape that rebates make sustainable.
+    </p>
+  </div>
+</section>
+
+<!-- ============ 10 · CLOSE ============ -->
+<section class="slide">
+  <span class="num">10</span>
+  <div class="bloom"></div>
+  <svg class="echo" width="700" height="700" viewBox="0 0 820 820">
+    <defs><linearGradient id="g3" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#F6DFA4"/><stop offset="1" stop-color="#C9964B"/></linearGradient></defs>
+    <g stroke-linejoin="round" stroke-width="66">
+      <path d="M 150 250 L 150 570 L 420 410 Z" fill="#F2EBDC" stroke="#F2EBDC" opacity="0.06"/>
+      <path d="M 285 250 L 285 570 L 555 410 Z" fill="#F2EBDC" stroke="#F2EBDC" opacity="0.11"/>
+      <path d="M 420 250 L 420 570 L 690 410 Z" fill="url(#g3)" stroke="url(#g3)" opacity="0.26"/>
+    </g>
+  </svg>
+
+  <div class="fill">
+    <p class="eyebrow">Try it before you decide</p>
+    <h2 style="margin-top:.16in; font-size:36pt">
+      You can pay a handle<br>in the next <span class="grad">sixty seconds.</span>
+    </h2>
+    <p class="lede" style="margin-top:.26in; max-width:6.4in">
+      No install, no seed phrase, no test tokens to request. Reply to the X bot or message
+      the Telegram bot and watch a wallet come into existence.
+    </p>
+
+    <div style="margin-top:.36in; display:flex; gap:.5in">
+      <div>
+        <p class="eyebrow" style="font-size:9pt">Live product</p>
+        <p style="margin-top:.1in; font-size:12pt; font-weight:700; line-height:1.65">
+          selkiepay.vercel.app<br>
+          x.com/SelkiePay<br>
+          t.me/selkiepay_bot
+        </p>
+      </div>
+      <div>
+        <p class="eyebrow" style="font-size:9pt">Code &amp; contact</p>
+        <p style="margin-top:.1in; font-size:12pt; font-weight:700; line-height:1.65">
+          github.com/martinvibes/Selkie<br>
+          martinmachiebe21@gmail.com<br>
+          Martin — Selkie
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <div class="foot">
+    <span class="wordmark"><span class="w" style="font-size:11pt">SELKIE</span></span>
+    <span>Any handle is a wallet.</span>
+  </div>
+</section>
+
+</body>
+</html>

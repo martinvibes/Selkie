@@ -1,0 +1,532 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Selkie — Technical Whitepaper</title>
+<style>
+  @page { size: A4; margin: 20mm 18mm; }
+  @page :first { margin: 0; }
+
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+
+  :root {
+    --ink:#15121C;
+    --body:#3A3646;
+    --mute:#6B6577;
+    --gold:#A9762C;
+    --gold-lt:#C9964B;
+    --rule:#E2DDD2;
+    --panel:#FAF7F0;
+    --dark:#0B0912;
+    --cream:#F2EBDC;
+  }
+
+  body {
+    font-family:"Avenir Next","Helvetica Neue",Arial,sans-serif;
+    color:var(--body); font-size:10.2pt; line-height:1.62;
+    background:#fff; -webkit-font-smoothing:antialiased;
+  }
+
+  /* ---------- cover ---------- */
+  .cover {
+    width:210mm; height:297mm; background:var(--dark); color:var(--cream);
+    padding:34mm 24mm; position:relative; overflow:hidden;
+    page-break-after:always; display:flex; flex-direction:column;
+  }
+  .cover .bloom {
+    position:absolute; right:-50mm; bottom:-70mm; width:170mm; height:170mm; border-radius:50%;
+    background:radial-gradient(circle, rgba(246,223,164,.10) 0%, rgba(246,223,164,0) 62%);
+  }
+  .cover .echo { position:absolute; right:-26mm; bottom:-34mm; }
+  .cover .wm { display:flex; align-items:center; gap:5mm; }
+  .cover .wm span { font-size:15pt; font-weight:800; letter-spacing:.26em; }
+  .cover h1 {
+    font-size:38pt; font-weight:800; line-height:1.04; letter-spacing:-.025em;
+    color:var(--cream); margin-top:6mm;
+  }
+  .cover .grad {
+    background:linear-gradient(120deg,#F6DFA4,#C9964B);
+    -webkit-background-clip:text; background-clip:text; color:transparent;
+  }
+  .cover .kick {
+    font-size:10pt; font-weight:800; letter-spacing:.22em; text-transform:uppercase; color:#C9964B;
+  }
+  .cover .sub { font-size:13pt; line-height:1.55; color:rgba(242,235,220,.66); margin-top:8mm; max-width:120mm; font-weight:500; }
+  .cover .meta {
+    margin-top:auto; border-top:1px solid rgba(242,235,220,.16); padding-top:6mm;
+    display:flex; justify-content:space-between; font-size:9.5pt; color:rgba(242,235,220,.5); font-weight:600;
+  }
+  .cover .cmd {
+    display:inline-block; border:1px solid rgba(242,235,220,.22); border-radius:4mm;
+    background:rgba(242,235,220,.05); padding:5mm 8mm; margin-top:10mm;
+    font-family:"SF Mono",Menlo,monospace; font-size:17pt; font-weight:500;
+  }
+  .cover .cmd .at { color:#F6DFA4; }
+
+  /* ---------- type ---------- */
+  h2 {
+    font-size:17pt; font-weight:800; color:var(--ink); letter-spacing:-.02em;
+    margin:11mm 0 3.5mm; padding-bottom:2mm; border-bottom:2px solid var(--gold);
+    break-after:avoid;
+  }
+  h2:first-of-type { margin-top:0; }
+  h3 {
+    font-size:11.5pt; font-weight:800; color:var(--ink); margin:6mm 0 2mm;
+    break-after:avoid;
+  }
+  p { margin-bottom:3mm; }
+  strong { color:var(--ink); font-weight:700; }
+  ul { margin:0 0 3.5mm 5mm; }
+  li { margin-bottom:1.6mm; }
+  code {
+    font-family:"SF Mono",Menlo,monospace; font-size:9pt;
+    background:var(--panel); border:1px solid var(--rule); border-radius:2px;
+    padding:.4mm 1.2mm; color:var(--gold);
+  }
+  a { color:var(--gold); text-decoration:none; }
+
+  .lede { font-size:11.5pt; line-height:1.6; color:var(--ink); font-weight:500; }
+
+  table { width:100%; border-collapse:collapse; margin:3mm 0 4mm; font-size:9.4pt; break-inside:avoid; }
+  th {
+    text-align:left; font-size:8pt; font-weight:800; letter-spacing:.12em; text-transform:uppercase;
+    color:var(--gold); border-bottom:1.5px solid var(--gold); padding:2mm 2.5mm 1.6mm;
+  }
+  td { padding:2.2mm 2.5mm; border-bottom:1px solid var(--rule); vertical-align:top; }
+  td:first-child { font-weight:700; color:var(--ink); white-space:nowrap; }
+  .num-col { text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap; }
+
+  .panel {
+    background:var(--panel); border:1px solid var(--rule); border-left:3px solid var(--gold);
+    border-radius:2mm; padding:4mm 5mm; margin:4mm 0; break-inside:avoid;
+  }
+  .panel .h {
+    font-size:8pt; font-weight:800; letter-spacing:.14em; text-transform:uppercase;
+    color:var(--gold); margin-bottom:2mm;
+  }
+  .mono-block {
+    font-family:"SF Mono",Menlo,monospace; font-size:8pt; line-height:1.75;
+    color:var(--body); word-break:break-all;
+  }
+
+  .kpi { display:flex; gap:4mm; margin:4mm 0; break-inside:avoid; }
+  .kpi div {
+    flex:1; border:1px solid var(--rule); border-radius:2mm; padding:3.5mm;
+    background:var(--panel);
+  }
+  .kpi .n { font-size:14pt; font-weight:800; color:var(--ink); letter-spacing:-.02em; }
+  .kpi .l { font-size:8.4pt; color:var(--mute); line-height:1.4; margin-top:1mm; font-weight:600; }
+
+  .brk { page-break-before:always; }
+  .foot-note { font-size:8.6pt; color:var(--mute); font-style:italic; }
+</style>
+</head>
+<body>
+
+<!-- ================= COVER ================= -->
+<div class="cover">
+  <div class="bloom"></div>
+  <svg class="echo" width="330" height="330" viewBox="0 0 820 820">
+    <defs><linearGradient id="gc" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#F6DFA4"/><stop offset="1" stop-color="#C9964B"/></linearGradient></defs>
+    <g stroke-linejoin="round" stroke-width="66">
+      <path d="M 150 250 L 150 570 L 420 410 Z" fill="#F2EBDC" stroke="#F2EBDC" opacity="0.06"/>
+      <path d="M 285 250 L 285 570 L 555 410 Z" fill="#F2EBDC" stroke="#F2EBDC" opacity="0.11"/>
+      <path d="M 420 250 L 420 570 L 690 410 Z" fill="url(#gc)" stroke="url(#gc)" opacity="0.26"/>
+    </g>
+  </svg>
+
+  <div class="wm">
+    <svg width="34" height="34" viewBox="0 0 220 220">
+      <defs><linearGradient id="gw" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" stop-color="#F6DFA4"/><stop offset="1" stop-color="#C9964B"/></linearGradient></defs>
+      <g stroke-linejoin="round" stroke-width="26">
+        <path d="M 26 62 L 26 158 L 108 110 Z" fill="#F2EBDC" stroke="#F2EBDC" opacity="0.18"/>
+        <path d="M 68 62 L 68 158 L 150 110 Z" fill="#F2EBDC" stroke="#F2EBDC" opacity="0.42"/>
+        <path d="M 110 62 L 110 158 L 192 110 Z" fill="url(#gw)" stroke="url(#gw)"/>
+      </g>
+    </svg>
+    <span>SELKIE</span>
+  </div>
+
+  <div style="margin-top:34mm">
+    <p class="kick">Technical Whitepaper</p>
+    <h1>Identity-addressed<br>payments, and the<br><span class="grad">wallet that opens<br>on arrival.</span></h1>
+    <p class="sub">
+      A payment protocol in which the recipient's account is created inside the
+      transaction that funds it — removing the claim step that loses 20–40% of all
+      reward value, and giving software a way to pay humans by name.
+    </p>
+    <div class="cmd">send 5 CC to <span class="at">@ada</span></div>
+  </div>
+
+  <div class="meta">
+    <span>Prepared for the BOT Chain Ecosystem Support &amp; Incentive Program</span>
+    <span>v1.0 · August 2026</span>
+  </div>
+</div>
+
+<!-- ================= BODY ================= -->
+
+<h2>1 · Abstract</h2>
+<p class="lede">
+  Selkie is a payments protocol and application in which a social handle is the account.
+  A sender names a recipient the way people already name each other — <code>@ada</code> —
+  and if that handle has no account, one is created inside the same atomic transaction
+  that pays it.
+</p>
+<p>
+  This inverts the standard onboarding sequence. Conventionally, a person must acquire a
+  wallet, secure a seed phrase, obtain gas, and surface an address <em>before</em> they can
+  receive value. Selkie removes that ordering constraint: value arrives first, and the
+  account exists as a consequence of the payment rather than a precondition of it. There is
+  no claim step, no invite link, and no action required from the recipient at all.
+</p>
+<p>
+  Selkie is live today on the Canton Network DevNet with three production surfaces — an X
+  bot, a Telegram bot, and a web wallet — sharing a single dispatch core. This paper
+  specifies the protocol, documents what is running and verifiable today, and sets out a
+  native deployment plan for BOT Chain, where the combination of EVM compatibility,
+  sub-second blocks, near-zero fees and an AI-agent-centric ecosystem makes the model
+  economically viable for the first time.
+</p>
+
+<h2>2 · The problem</h2>
+
+<h3>2.1 The claim step is where value leaks</h3>
+<p>
+  Reward campaigns, airdrops, bounties and community payouts share a failure mode: the
+  recipient must perform technical work to collect. Install a wallet, record twelve words,
+  acquire gas for a chain they have never used, then produce a forty-character address.
+  Industry-wide, between 20% and 40% of distributed reward value is never collected. That
+  loss is not a marketing problem — it is a protocol design problem. The recipient is
+  required to act before the value can exist for them.
+</p>
+
+<h3>2.2 Small payments are economically forbidden on most chains</h3>
+<p>
+  Social payments are, by nature, small: a $0.50 tip, a $2 bounty, a $5 split. On a chain
+  where a transaction costs more than the value it moves, these payments cannot exist
+  regardless of interface quality. This is the structural reason consumer crypto payments
+  have repeatedly failed to reach scale, and it is a constraint no amount of UX work can
+  remove.
+</p>
+
+<h3>2.3 Software has no way to pay a person</h3>
+<p>
+  An autonomous agent can call a contract, hold a balance, and settle with another agent.
+  It cannot onboard a human. When an agent needs to pay a person — for a completed task,
+  a labelled dataset, a referral, a piece of work — it encounters a recipient with no
+  address and no wallet, and there is no procedure it can execute to fix that. There is no
+  identity-addressed payment rail between software and people. Agent-to-human payment is
+  therefore not a market with poor tooling; it is a market that cannot presently exist.
+</p>
+
+<div class="panel">
+  <p class="h">The thesis</p>
+  <p style="margin:0">
+    These three problems have a single solution. If accounts are addressed by identity
+    rather than by key material, and are created by the act of payment rather than in
+    advance of it, then the claim step disappears, the recipient needs nothing, and any
+    system able to name a person is able to pay one.
+  </p>
+</div>
+
+<h2 class="brk">3 · Protocol design</h2>
+
+<h3>3.1 Handle binding and the uniqueness invariant</h3>
+<p>
+  A handle maps to exactly one account. This invariant is enforced on-ledger rather than in
+  application code: an <code>AccountDirectory</code> contract exposes a consuming choice that
+  serialises registration, and the account is created in the same transaction. Because the
+  choice is consuming, two concurrent registrations for the same handle cannot both succeed
+  — the second sees a spent contract and fails. A rollback therefore leaves no orphaned
+  account, and no reconciliation path is needed.
+</p>
+<p>
+  Handles are namespaced by surface, so an X handle and a Telegram handle are distinct
+  identities that a user may later associate with a single owner. Handle resolution happens
+  before settlement; the ledger never sees a string, only a resolved party.
+</p>
+
+<h3>3.2 Create-on-pay</h3>
+<p>
+  The core mechanism. When a transfer names a handle with no existing account, account
+  creation and the credit are submitted as a single atomic unit. Either the recipient exists
+  and is funded, or neither occurred. There is no intermediate state in which money is held
+  pending a claim, which means there is nothing to expire, nothing to reclaim, and no
+  unclaimed-balance liability to account for.
+</p>
+<p>
+  This is the property that distinguishes Selkie from link-based or voucher-based
+  "send to anyone" systems. Those systems create a claimable artefact and hope it is
+  redeemed; the unredeemed portion is precisely the 20–40% loss described above. Selkie
+  creates the account instead, so redemption is not an event that can fail to happen.
+</p>
+
+<h3>3.3 Requests are contracts, not messages</h3>
+<p>
+  Asking someone for money creates a <code>Request</code> contract naming the payer. Creating it
+  moves nothing. The payer's approval is a single transaction that creates the transfer and
+  executes it, so there is no window in which funds belong to neither party. The ledger — not
+  the application server — enforces that only the named payer may approve. A request is
+  therefore safe to expose to untrusted surfaces: the worst outcome of a malicious request is
+  that it is ignored.
+</p>
+
+<h3>3.4 Conditional payments</h3>
+<p>
+  An <code>Escrow</code> contract supports two-party conditional payment: funds are debited from
+  the payer in the same atomic transaction that creates the escrow, and are released to the
+  payee, refunded with the payee's consent, or refunded unilaterally after a deadline. This
+  makes agent-to-human task payment expressible as a first-class primitive — an agent can
+  commit funds against a deliverable without either side trusting the other.
+</p>
+
+<h3>3.5 Custody model</h3>
+<p>
+  Selkie's custody design is stated plainly because it is the first question a technical
+  reviewer asks. On networks where per-user accounts can be provisioned freely, each handle
+  receives its own distinct on-ledger party and holds its own balance. On the shared DevNet
+  node where party allocation is an administrator operation outside our control, deposits are
+  received at a single party with per-handle ownership tracked in contracts — an omnibus
+  model. The BOT Chain deployment uses the per-user model, since account creation on an EVM
+  chain requires no privileged operation.
+</p>
+
+<h2>4 · Contract architecture</h2>
+<p>
+  Selkie's on-chain surface is deliberately minimal. The complete ledger model is
+  <strong>307 lines across six contracts</strong>. Everything else — command parsing, handle
+  resolution, session management, campaign orchestration, all three user surfaces — lives off
+  ledger and is chain-agnostic.
+</p>
+
+<table>
+  <thead>
+    <tr><th>Contract</th><th>Responsibility</th><th class="num-col">Lines</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>Account</td><td>Handle-to-party binding, the directory, and the consuming choice that guarantees one handle equals one account</td><td class="num-col">83</td></tr>
+    <tr><td>Escrow</td><td>Two-party conditional payment with release, consented refund and unilateral timeout refund</td><td class="num-col">55</td></tr>
+    <tr><td>Request</td><td>Payment requests as contracts; only the named payer can approve</td><td class="num-col">46</td></tr>
+    <tr><td>Holding</td><td>Per-asset balances owned by a party</td><td class="num-col">44</td></tr>
+    <tr><td>Transfer</td><td>Atomic debit and credit, including create-on-pay for unknown handles</td><td class="num-col">40</td></tr>
+    <tr><td>Rewards</td><td>Bulk campaign payout to a list of handles in one submission</td><td class="num-col">39</td></tr>
+    <tr><td><strong>Total</strong></td><td>Complete on-ledger model</td><td class="num-col"><strong>307</strong></td></tr>
+  </tbody>
+</table>
+
+<p class="foot-note">
+  Line counts are of contract source excluding the test module, verifiable in the public
+  repository at <code>daml/daml/Selkie/</code>.
+</p>
+
+<h3>4.1 System architecture</h3>
+<p>
+  Three surfaces share one core. <code>bot/src/dispatch.mjs</code> parses and executes every
+  command, and is called identically by the X worker, the Telegram bot and the web server.
+  Adding a surface — including a machine-facing API for agents — means writing a driver that
+  translates an inbound message into a dispatch call. It does not mean touching wallet logic,
+  and it cannot introduce a divergence in behaviour between surfaces.
+</p>
+
+<h2 class="brk">5 · What is running today</h2>
+<p class="lede">
+  Every claim in this section is independently verifiable against a public network or the
+  open-source repository. Nothing here is a projection.
+</p>
+
+<div class="kpi">
+  <div><p class="n">81</p><p class="l">Active contracts live on DevNet at time of writing, including 16 accounts each at its own party</p></div>
+  <div><p class="n">1.9 cBTC<br>5.5 cETH</p><p class="l">Real tokenised assets held through the CIP-56 token standard, verified live 4 Aug 2026</p></div>
+  <div><p class="n">111</p><p class="l">Automated tests against a live participant node, including 12 live integration tests</p></div>
+  <div><p class="n">3</p><p class="l">Production surfaces: X bot, Telegram bot, web wallet</p></div>
+</div>
+
+<h3>5.1 Capability status</h3>
+<table>
+  <thead><tr><th>Capability</th><th>State</th></tr></thead>
+  <tbody>
+    <tr><td>Handle as wallet, no setup</td><td>Live on Canton 3.5.9</td></tr>
+    <tr><td>Pay a handle with no account</td><td>Live — account created in the same transaction</td></tr>
+    <tr><td>Request payment from a handle</td><td>Live — settles only on the payer's approval</td></tr>
+    <tr><td>Conditional escrow with timeout refund</td><td>Live on the bot surface</td></tr>
+    <tr><td>Bulk campaign payout</td><td>Live over HTTP and Telegram</td></tr>
+    <tr><td>Inbound deposit from an external wallet</td><td>Live — received at a handle-tagged party</td></tr>
+    <tr><td>Real cBTC / cETH via CIP-56</td><td>Settled on the shared DevNet node</td></tr>
+    <tr><td>X sign-in</td><td>Live — OAuth 2.0 PKCE</td></tr>
+  </tbody>
+</table>
+
+<h3>5.2 Settlement evidence</h3>
+<p>
+  A read-only query against the shared DevNet participant on <strong>4 August 2026</strong>
+  (ledger offset 511565) returns 81 active contracts at Selkie's operator party: 53 holdings,
+  16 accounts, 1 account directory, and 4 token-standard transfer records. Real tokenised assets
+  held under CIP-56 at external registrars are <strong>1.9 cBTC</strong> and
+  <strong>5.5 cETH</strong> — accepted through the token standard rather than minted as labels in
+  Selkie's own contracts.
+</p>
+<p>
+  Each of the 16 accounts resolves to a <em>distinct</em> Canton party, demonstrating the per-user
+  account model operating on a network Selkie does not administer. One of the four transfer
+  records is outbound — 3.0 cETH sent from the operator party to an individual user's party
+  through the token standard — proving the complete path from external registrar, into Selkie,
+  and out to a user. Historical acceptance used <code>TransferInstruction_Accept</code> with choice
+  contexts from the DA Utility Registry, followed by settlement through
+  <code>TransferFactory_Transfer</code>. Ledger update IDs:
+</p>
+<div class="panel">
+  <p class="h">Ledger update identifiers</p>
+  <p class="mono-block" style="margin:0">
+    1220c66531a3dd8369c94fb6fdfee6b43f22b1c8fc9867f632e8ce77be4a4fbe3c<br>
+    1220f79f7d18ff74a013f9c7ce11edf34dba1aebe8c0516b82de4be436344aecb3<br>
+    12205ecfd75f1820753b38f0618f6351f22e10c5d8853f3da0c14c07a76cdf1929<br>
+    12203c83a812b556fa9dd5159422968b0fa0fbe2c0139f0bd60f437ec732bc0258e6
+  </p>
+</div>
+<p>
+  Selkie's contract package is deployed to the shared DevNet participant, and the wallet logic
+  runs against that node with configuration changes only — no code changes. Two handles resolve
+  to two distinct parties, one pays the other, and settlement occurs on a network we do not
+  operate. This is the distinction between software that works locally and software that works
+  on a network.
+</p>
+
+<h2>6 · BOT Chain deployment</h2>
+
+<h3>6.1 Why BOT Chain</h3>
+<p>
+  <strong>Fee economics.</strong> Selkie's transaction profile is high-count and low-value —
+  precisely the profile that most chains price out of existence. Sub-second block times and
+  near-zero fees are the first conditions under which handle-to-handle payments of a dollar or
+  less are viable at all. Gas rebates compound this directly: a rebate against a high-frequency
+  micro-payment workload is worth substantially more than the same rebate against a low-frequency
+  high-value one.
+</p>
+<p>
+  <strong>Ecosystem thesis.</strong> BOT Chain is building settlement infrastructure for
+  autonomous agents. The unresolved gap in that thesis is the human edge: agents can pay each
+  other, but cannot pay people. Selkie supplies exactly that edge, and does so with a mechanism
+  — create-on-pay — that requires nothing from the human at all.
+</p>
+<p>
+  <strong>Portability.</strong> EVM compatibility means the port is a Solidity implementation of
+  six contracts whose semantics are already specified and proven in production, not an
+  exploratory rebuild.
+</p>
+
+<h3>6.2 What ports, and what is rewritten</h3>
+<table>
+  <thead><tr><th>Layer</th><th>Disposition</th></tr></thead>
+  <tbody>
+    <tr><td>X bot, Telegram bot, web wallet</td><td>Ports unchanged — chain-agnostic Node.js and React</td></tr>
+    <tr><td>Dispatch core and command parser</td><td>Ports unchanged</td></tr>
+    <tr><td>Handle resolution, sessions, campaigns</td><td>Ports unchanged</td></tr>
+    <tr><td>Six ledger contracts (307 lines)</td><td>Rewritten in Solidity against the same specification</td></tr>
+  </tbody>
+</table>
+<p>
+  The create-on-pay invariant maps cleanly to EVM semantics: a registry contract holds the
+  handle-to-account mapping, and the transfer function creates the recipient record and credits
+  it within a single transaction, reverting as a unit on failure. Atomicity, which is the
+  property the whole design depends on, is a native guarantee of EVM transaction execution.
+</p>
+
+<h3>6.3 The agent payment interface</h3>
+<p>
+  Beyond porting the existing product, the BOT Chain deployment adds a machine-facing endpoint:
+  an agent presents a handle and an amount, and settlement occurs whether or not that handle has
+  ever been seen before. Because this is a driver over the existing dispatch core rather than a
+  parallel implementation, it inherits the identical semantics as the human surfaces — including
+  create-on-pay, escrow and the request flow.
+</p>
+
+<h3>6.4 Growth mechanics</h3>
+<p>
+  Selkie's distribution is structurally unusual: users arrive as <em>recipients</em>, not as
+  signups. A community manager paying 40 contributors produces 40 funded accounts at zero
+  acquisition cost, each already holding a balance. An agent operator settling task rewards
+  produces the same effect continuously. Because every payment on a public surface names its
+  recipient, each settlement is also a public demonstration of the product to an audience that
+  already trusts the sender.
+</p>
+
+<h2 class="brk">7 · Market</h2>
+<p>
+  <strong>Agent and protocol payouts.</strong> Task bounties, data labelling, RLHF work,
+  referral splits and community rewards. In every case the bottleneck is the recipient's missing
+  wallet, and in every case a single call naming a handle removes it.
+</p>
+<p>
+  <strong>Emerging-market consumer payments, Nigeria first.</strong> The target user does not own
+  a hardware wallet and will not install one. They own a phone and a social handle — which, under
+  Selkie's model, is already a complete account. The same contracts serve an agent paying a
+  worker and a person paying a friend.
+</p>
+
+<h2>8 · Compliance and integrity posture</h2>
+<p>
+  Selkie's growth metric is funded accounts created by real payments from real senders. This is
+  worth stating precisely in the context of an incentive program, because the mechanism that
+  would inflate such a metric — generating addresses under single control and funding them from
+  one source — is both detectable through funding-source analysis and self-defeating under
+  Sybil-resistance rules that discount common-funded addresses.
+</p>
+<p>
+  Selkie's design gives it no incentive to attempt this. Its distribution advantage comes from
+  third parties paying their own contributors with their own funds; a synthetic user produces no
+  such payment and therefore no growth. We will report only accounts arising from genuine
+  third-party payments, and we accept audit of the funding graph on that basis.
+</p>
+
+<h2>9 · Honest limitations</h2>
+<p>
+  A whitepaper that lists only strengths is not informative. The following are the real
+  constraints as of August 2026.
+</p>
+<ul>
+  <li><strong>No mainnet deployment.</strong> Selkie runs on a public test network. Nothing is
+    live on any mainnet, including Canton's.</li>
+  <li><strong>Custody is honest but not final.</strong> On the shared DevNet node, deposits are
+    received at a single party with per-handle ownership tracked in contracts. Per-user accounts
+    are proven on networks that permit self-service account creation, and are the model for BOT
+    Chain, but the omnibus arrangement is what runs on the shared node today.</li>
+  <li><strong>Withdrawal to external wallets is not complete.</strong> The outbound settlement
+    path itself is proven — a cBTC transfer was settled through the token standard — but a
+    general user-facing withdrawal flow is not yet built.</li>
+  <li><strong>Escrow is bot-surface only.</strong> The contract, parser, dispatch path and tests
+    are complete; it is not yet exposed in the web interface.</li>
+  <li><strong>Bot surfaces are single-process.</strong> The X and Telegram workers currently run
+    as one process rather than a redundant deployment. Production hardening of this is part of
+    the deployment plan.</li>
+  <li><strong>Privacy claims are network-specific.</strong> On Canton, payment confidentiality is
+    enforced by the ledger. BOT Chain is a public ledger, so Selkie makes <em>no</em>
+    confidentiality claim there. What carries over is the practical property that users exchange
+    handles rather than addresses — not cryptographic privacy, and we do not describe it as
+    such.</li>
+</ul>
+
+<h2>10 · References</h2>
+<table>
+  <tbody>
+    <tr><td>Live application</td><td><a href="https://selkiepay.vercel.app">selkiepay.vercel.app</a></td></tr>
+    <tr><td>Source code</td><td><a href="https://github.com/martinvibes/Selkie">github.com/martinvibes/Selkie</a></td></tr>
+    <tr><td>X surface</td><td><a href="https://x.com/SelkiePay">x.com/SelkiePay</a></td></tr>
+    <tr><td>Telegram surface</td><td><a href="https://t.me/selkiepay_bot">t.me/selkiepay_bot</a></td></tr>
+    <tr><td>Contact</td><td>Martin — martinmachiebe21@gmail.com</td></tr>
+  </tbody>
+</table>
+
+<div class="panel" style="margin-top:6mm">
+  <p class="h">Verify it directly</p>
+  <p style="margin:0">
+    Reply to <strong>@SelkiePay</strong> on X, or message <strong>@selkiepay_bot</strong> on
+    Telegram, with <code>send 5 CC to @ada</code>. No installation, no seed phrase and no test
+    tokens are required to see a wallet come into existence.
+  </p>
+</div>
+
+</body>
+</html>
